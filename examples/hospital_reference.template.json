@@ -1,0 +1,17 @@
+{
+  "version": "请填写医院资料版本和统计范围",
+  "complete_sections": [],
+  "surgery_grades": {},
+  "procedure_aliases": {},
+  "physician_ids": {},
+  "department_heads": {},
+  "registered_types": [],
+  "special_antibiotics": [],
+  "workdays": [],
+  "calendar_start": null,
+  "calendar_end": null,
+  "dispute_inventory_complete": false,
+  "project_inventory_complete": false,
+  "project_cycle_start": null,
+  "projects": []
+}

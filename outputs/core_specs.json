@@ -1,0 +1,2367 @@
+[
+  {
+    "id": "core_01",
+    "name": "一、患者入院48小时内转科的比例",
+    "definition": "入院48小时内转科患者人次数占同期入院患者总人次数的比例。",
+    "formula": "入院48小时内转科患者人次数 ÷ 同期入院患者总人次数 ×100%",
+    "notes": "①按原文说明，本指标不包括转入/转出ICU的转科；②区分“人次数”，同一患者多次入院分别计；③时间差依据病历转科记录时间戳计算。",
+    "kind": "rate",
+    "numerator_prompt": "解析病历入院记录、转科记录，统计【从入院时间起算48小时之内发生转科】的患者人次数。判定以转科记录的记录时间为准，且需排除患者转入/转出ICU的转科情况。以入院时间为起点，转科操作时间≤入院时间 + 48 小时则输出为“1”，否则输出为“0”；多次转科只要其中一次满足 48 小时内则输出为“1”，同一患者多次入院分别计数。无论结果输出为“1/0”，均给出相应理由。",
+    "denominator_prompt": "结果输出为“1”。",
+    "hospital_notes": "",
+    "prompt_sources": {
+      "numerator": "工作表1!E2",
+      "denominator": "工作表1!F2",
+      "notes": "工作表1!G2",
+      "hospital_notes": "工作表1!H2"
+    },
+    "unit": "住院人次",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B2:G2",
+    "automation": "candidate_events",
+    "requires_external": false,
+    "fact_types": [
+      "admission",
+      "transfer"
+    ],
+    "page_categories": [
+      "cover",
+      "admission",
+      "transfer",
+      "progress",
+      "orders",
+      "nursing"
+    ],
+    "counting_unit": "住院人次",
+    "period_anchor": "admission",
+    "rule_conflict": null,
+    "external_requirements": [],
+    "fact_fields": {
+      "admission": {
+        "patient_id": "text",
+        "episode_id": "text",
+        "department": "text",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "transfer": {
+        "occurred": "bool",
+        "from_department": "text",
+        "to_department": "text",
+        "from_icu": "bool",
+        "to_icu": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_02",
+    "name": "二、患者入院8小时内查房率",
+    "definition": "入院8小时内开具检查或治疗医嘱的患者人次数占同期入院患者总人次数的比例。",
+    "formula": "入院8小时内开具检查或治疗医嘱的患者人次数 ÷ 同期入院患者总人次数 ×100%",
+    "notes": "①注意本指标原文以“开具检查或治疗医嘱”判定，不是查房记录；②反映查房的及时性；③以医嘱开具时间戳为准。",
+    "kind": "rate",
+    "numerator_prompt": "解析入院记录与医嘱记录，统计【从入院时间起算8小时之内开具了检查或治疗医嘱】的患者人次数。以医嘱开具时间为判定时点；同一次入院内只要有至少1条检查/治疗医嘱开具时间落在入院后8小时内，本次输出为“1”，否则输出为“0”。无论结果输出为“1/0”，均给出相应理由。",
+    "denominator_prompt": "结果输出为“1”。",
+    "hospital_notes": "",
+    "prompt_sources": {
+      "numerator": "工作表1!E3",
+      "denominator": "工作表1!F3",
+      "notes": "工作表1!G3",
+      "hospital_notes": "工作表1!H3"
+    },
+    "unit": "住院人次",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B3:G3",
+    "automation": "candidate_events",
+    "requires_external": false,
+    "fact_types": [
+      "admission",
+      "order"
+    ],
+    "page_categories": [
+      "cover",
+      "admission",
+      "orders"
+    ],
+    "counting_unit": "住院人次",
+    "period_anchor": "admission",
+    "rule_conflict": null,
+    "external_requirements": [],
+    "fact_fields": {
+      "admission": {
+        "patient_id": "text",
+        "episode_id": "text",
+        "department": "text",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "order": {
+        "order_id": "text",
+        "order_category": "text",
+        "order_type": "text",
+        "content": "text",
+        "stop_time": "time",
+        "drug_name": "text",
+        "is_medication": "bool",
+        "event_date": "date",
+        "record_date": "date",
+        "stop_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_03",
+    "name": "三、上级医师查房记录规范率",
+    "definition": "住院患者病历中上级医师查房记录规范、完整的病例数量占同期住院患者病例总数量的比例。",
+    "formula": "住院患者病历中上级医师查房记录规范、完整的病例数量 ÷ 同期住院患者病例总数量 ×100%",
+    "notes": "①区分“病例数量”，1次住院=1病例；②反映三级查房制度落实与查房记录规范性；③要素缺失的记录不纳入分子。",
+    "kind": "rate",
+    "numerator_prompt": "解析全部住院病程中的上级医师查房记录（主治医师查房、副主任医师查房或主任医师查房均算上级医师查房），统计本次住院病历内上级医师查房记录【规范、完整】的住院病例数量。规范的判定要素包括：查房时间、上级医师身份（主治及以上）、病情分析内容、诊疗处置意见；完整的判定要素包括：普通患者、病重患者、病危患者均满足《山东省病历书写与管理基本规范》要求，规范和完整2者均满足，则输出为“1”，否则输出为“0”；无论结果输出为“1/0”，均给出相应理由。",
+    "denominator_prompt": "结果输出为“1”。",
+    "hospital_notes": "",
+    "prompt_sources": {
+      "numerator": "工作表1!E4",
+      "denominator": "工作表1!F4",
+      "notes": "工作表1!G4",
+      "hospital_notes": "工作表1!H4"
+    },
+    "unit": "病例",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B4:G4",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "admission",
+      "ward_round"
+    ],
+    "page_categories": [
+      "admission",
+      "progress"
+    ],
+    "counting_unit": "住院病例",
+    "period_anchor": "admission",
+    "rule_conflict": null,
+    "external_requirements": [],
+    "fact_fields": {
+      "admission": {
+        "patient_id": "text",
+        "episode_id": "text",
+        "department": "text",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "ward_round": {
+        "physician": "text",
+        "physician_role": "text",
+        "analysis": "text",
+        "plan": "text",
+        "severity": "text",
+        "norm_compliant": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_04",
+    "name": "四、住院患者非计划手术率",
+    "definition": "行非计划手术的住院患者人次数占同期住院患者总人次数的比例。",
+    "formula": "行非计划手术的住院患者人次数 ÷ 同期住院患者总人次数 ×100%",
+    "notes": "①本指标为“住院患者人次数/住院总人次数”，分母是住院患者人次而非手术台次；②结合病程判断是否属于临时追加的非计划手术。",
+    "kind": "rate",
+    "numerator_prompt": "对比入院诊疗计划、术前小结与手术记录，统计本次住院期间【预先未纳入诊疗计划、因病情变化临时实施手术】的住院患者人次数。若患者判定为非计划手术患者，本次输出为“1”，否则输出为“0”。无论结果输出为“1/0”，均给出相应理由。",
+    "denominator_prompt": "结果输出为“1”。",
+    "hospital_notes": "",
+    "prompt_sources": {
+      "numerator": "工作表1!E5",
+      "denominator": "工作表1!F5",
+      "notes": "工作表1!G5",
+      "hospital_notes": "工作表1!H5"
+    },
+    "unit": "住院人次",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B5:G5",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "admission",
+      "surgery"
+    ],
+    "page_categories": [
+      "cover",
+      "admission",
+      "surgery",
+      "progress",
+      "discussion"
+    ],
+    "counting_unit": "住院人次",
+    "period_anchor": "admission",
+    "rule_conflict": null,
+    "external_requirements": [],
+    "fact_fields": {
+      "admission": {
+        "patient_id": "text",
+        "episode_id": "text",
+        "department": "text",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "surgery": {
+        "surgery_id": "text",
+        "procedure_name": "text",
+        "procedure_code": "text",
+        "grade": "int",
+        "end_time": "time",
+        "surgeon": "text",
+        "surgeon_id": "text",
+        "planned_surgeon": "text",
+        "planned_surgeon_id": "text",
+        "planned_procedure": "text",
+        "procedure_consistent": "bool",
+        "unplanned": "bool",
+        "reoperation": "bool",
+        "emergency_lifesaving": "bool",
+        "intraoperative_transfusion": "bool",
+        "autotransfusion": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_05",
+    "name": "五、急会诊及时到位率",
+    "definition": "急会诊请求发出后，10分钟内到达现场的急会诊次数占同期急会诊总次数的比例。",
+    "formula": "急会诊记录中10分钟内到位的急会诊次数 ÷ 同期急会诊总次数 ×100%",
+    "notes": "①急会诊范围：疾病超出本科室诊疗范围和处置能力，且经评估可能随时危及生命，需院内其他科室医师立刻协助诊疗、参与抢救所发出的会诊申请；②以病历会诊记录到达时间戳为准。",
+    "kind": "rate",
+    "numerator_prompt": "读取会诊申请单中会诊类型为急会诊的记录，以【急会诊请求发出时间】为起点、会诊医师到达现场时间为终点，两者时间差≤10分钟的急会诊输出结果为“1”；每一次急会诊申请至到位流程统计1次，最终输出为累计按时完成急会诊总次数，并说明结果依据。",
+    "denominator_prompt": "病历中含有1份“急会诊”申请单，则判定为有效一次，最终输出为累计总次数，没有则输出为“0”，并说明结果依据。",
+    "hospital_notes": "",
+    "prompt_sources": {
+      "numerator": "工作表1!E6",
+      "denominator": "工作表1!F6",
+      "notes": "工作表1!G6",
+      "hospital_notes": "工作表1!H6"
+    },
+    "unit": "急会诊次数",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B6:G6",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "consultation"
+    ],
+    "page_categories": [
+      "consultation",
+      "progress"
+    ],
+    "counting_unit": "急会诊事件",
+    "period_anchor": "consultation",
+    "rule_conflict": null,
+    "external_requirements": [],
+    "fact_fields": {
+      "consultation": {
+        "consultation_id": "text",
+        "urgency": "text",
+        "arrival_time": "time",
+        "completion_time": "time",
+        "opinion": "text",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_06",
+    "name": "六、急会诊有效率",
+    "definition": "急会诊后开具相关医嘱的次数占同期急会诊总次数的比例。",
+    "formula": "急会诊后开具相关医嘱的次数 ÷ 同期急会诊总次数 ×100%",
+    "notes": "按原文说明：急会诊后开具相关医嘱的统计方法为“申请急会诊后40分钟内开具相关医嘱”。",
+    "kind": "rate",
+    "numerator_prompt": "逐条核对急会诊记录与申请急会诊后的医嘱内容，统计【在申请急会诊后40分钟内开具了相关医嘱】的急会诊次数；所开具医嘱需与本次急会诊意见存在明确对应关系，则输出为“1”，否则输出为“0”；无论结果输出为“1/0”，均给出相应理由。",
+    "denominator_prompt": "病历中含有1份“急会诊”申请单，则判定为有效一次，最终输出为累计总次数，没有则输出为“0”，并说明结果依据。",
+    "hospital_notes": "",
+    "prompt_sources": {
+      "numerator": "工作表1!E7",
+      "denominator": "工作表1!F7",
+      "notes": "工作表1!G7",
+      "hospital_notes": "工作表1!H7"
+    },
+    "unit": "急会诊次数",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B7:G7",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "consultation",
+      "order"
+    ],
+    "page_categories": [
+      "consultation",
+      "orders",
+      "progress"
+    ],
+    "counting_unit": "急会诊事件",
+    "period_anchor": "consultation",
+    "rule_conflict": null,
+    "external_requirements": [],
+    "fact_fields": {
+      "consultation": {
+        "consultation_id": "text",
+        "urgency": "text",
+        "arrival_time": "time",
+        "completion_time": "time",
+        "opinion": "text",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "order": {
+        "order_id": "text",
+        "order_category": "text",
+        "order_type": "text",
+        "content": "text",
+        "stop_time": "time",
+        "drug_name": "text",
+        "is_medication": "bool",
+        "event_date": "date",
+        "record_date": "date",
+        "stop_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_07",
+    "name": "七、普通会诊及时完成率",
+    "definition": "普通会诊24小时内完成次数占同期普通会诊总次数的比例。",
+    "formula": "普通会诊24小时内完成次数 ÷ 同期普通会诊总次数 ×100%",
+    "notes": "按原文说明：病历中会诊医师电子签章时间即为会诊完成时间，时间差以电子签章时间为准。",
+    "kind": "rate",
+    "numerator_prompt": "读取会诊申请单中会诊类型为普通会诊的记录，以【普通会诊请求发出时间】为起点、会诊医师到达现场时间为终点，两者时间差≤10分钟的急会诊输出结果为“1”；每一次急会诊申请至到位流程统计1次，最终输出为累计急会诊总次数，并说明结果依据。",
+    "denominator_prompt": "病历中含有1份“普通会诊”申请单，则判定为有效一次，最终输出为累计总次数，没有则输出为“0”，并说明结果依据。",
+    "hospital_notes": "",
+    "prompt_sources": {
+      "numerator": "工作表1!E8",
+      "denominator": "工作表1!F8",
+      "notes": "工作表1!G8",
+      "hospital_notes": "工作表1!H8"
+    },
+    "unit": "普通会诊次数",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B8:G8",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "consultation"
+    ],
+    "page_categories": [
+      "consultation",
+      "progress"
+    ],
+    "counting_unit": "普通会诊事件",
+    "period_anchor": "consultation",
+    "rule_conflict": "分子提示写急会诊10分钟，定义要求普通会诊24小时完成；采用定义，需医院确认。",
+    "external_requirements": [],
+    "fact_fields": {
+      "consultation": {
+        "consultation_id": "text",
+        "urgency": "text",
+        "arrival_time": "time",
+        "completion_time": "time",
+        "opinion": "text",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_08",
+    "name": "八、普通会诊有效率",
+    "definition": "普通会诊结束后开具相关医嘱的次数占同期普通会诊总次数的比例。",
+    "formula": "普通会诊结束后开具相关医嘱的次数 ÷ 同期普通会诊患者总次数 ×100%",
+    "notes": "①注意原文分母为“同期普通会诊患者总次数”，不是普通会诊总次数；②按原文说明：普通会诊后开具相关医嘱统计方法为“申请普通会诊后24小时内开具相关医嘱”。",
+    "kind": "rate",
+    "numerator_prompt": "逐条核对普通会诊记录与申请普通会诊后的医嘱内容，统计【在申请普通会诊后24小时内开具了相关医嘱】的普通会诊次数；所开具医嘱需与本次普通会诊意见存在明确对应关系，则输出为“1”，否则输出为“0”；无论结果输出为“1/0”，均给出相应理由。",
+    "denominator_prompt": "病历中含有1份“普通会诊”申请单，则判定为有效一次，最终输出为累计总次数，没有则输出为“0”，并说明结果依据。",
+    "hospital_notes": "",
+    "prompt_sources": {
+      "numerator": "工作表1!E9",
+      "denominator": "工作表1!F9",
+      "notes": "工作表1!G9",
+      "hospital_notes": "工作表1!H9"
+    },
+    "unit": "普通会诊次数",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B9:G9",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "consultation",
+      "order"
+    ],
+    "page_categories": [
+      "consultation",
+      "orders",
+      "progress"
+    ],
+    "counting_unit": "普通会诊事件",
+    "period_anchor": "consultation",
+    "rule_conflict": "分母的“患者总次数”与按申请单计次存在歧义；采用会诊事件，需医院确认。",
+    "external_requirements": [],
+    "fact_fields": {
+      "consultation": {
+        "consultation_id": "text",
+        "urgency": "text",
+        "arrival_time": "time",
+        "completion_time": "time",
+        "opinion": "text",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "order": {
+        "order_id": "text",
+        "order_category": "text",
+        "order_type": "text",
+        "content": "text",
+        "stop_time": "time",
+        "drug_name": "text",
+        "is_medication": "bool",
+        "event_date": "date",
+        "record_date": "date",
+        "stop_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_09",
+    "name": "九、手术患者特级护理/一级护理出院率",
+    "definition": "手术患者出院时为特级护理/一级护理级别的患者数量占同期手术患者总数量的比例。",
+    "formula": "手术患者出院时为特级护理/一级护理级别的患者数量 ÷ 同期手术患者总数量 ×100%",
+    "notes": "反映对住院患者进行分级护理动态调整的情况。\n需对接病案首页数据；做是否为手术患者的判断",
+    "kind": "rate",
+    "numerator_prompt": "解析病历，如果该患者存在手术（存在手术记录、介入下治疗、内镜下治疗）、且出院时护理级别为【特级护理或一级护理】，则输出为“1”，否则输出为“0”；无论结果输出为“1/0”，均给出相应理由。",
+    "denominator_prompt": "如果该患者存在手术（存在手术记录、介入治疗、内镜下治疗），输出结果为“1”，否则输出为“0”，均给出相应理由。",
+    "hospital_notes": "",
+    "prompt_sources": {
+      "numerator": "工作表1!E10",
+      "denominator": "工作表1!F10",
+      "notes": "工作表1!G10",
+      "hospital_notes": "工作表1!H10"
+    },
+    "unit": "手术患者",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B10:G10",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "admission",
+      "surgery",
+      "discharge"
+    ],
+    "page_categories": [
+      "cover",
+      "surgery",
+      "discharge",
+      "orders",
+      "nursing"
+    ],
+    "counting_unit": "手术患者住院人次",
+    "period_anchor": "discharge",
+    "rule_conflict": null,
+    "external_requirements": [],
+    "fact_fields": {
+      "admission": {
+        "patient_id": "text",
+        "episode_id": "text",
+        "department": "text",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "surgery": {
+        "surgery_id": "text",
+        "procedure_name": "text",
+        "procedure_code": "text",
+        "grade": "int",
+        "end_time": "time",
+        "surgeon": "text",
+        "surgeon_id": "text",
+        "planned_surgeon": "text",
+        "planned_surgeon_id": "text",
+        "planned_procedure": "text",
+        "procedure_consistent": "bool",
+        "unplanned": "bool",
+        "reoperation": "bool",
+        "emergency_lifesaving": "bool",
+        "intraoperative_transfusion": "bool",
+        "autotransfusion": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "discharge": {
+        "nursing_level": "text",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_10",
+    "name": "十、四级手术患者手术当日床旁交接班占比",
+    "definition": "四级手术患者手术当日进行床旁交接班的患者数量占同期进行四级手术的患者总数量的比例。",
+    "formula": "四级手术患者当日进行床旁交接班的患者数量 ÷ 同期进行四级手术的患者总数量 ×100%",
+    "notes": "按原文说明：①四级手术指机构手术分级管理目录中按四级管理的手术/操作；②手术当日床旁交接班应当具备相关纸质或影像记录。\n③可外挂本院手术管理知识库\n④需对接病案首页数据",
+    "kind": "rate",
+    "numerator_prompt": "解析患者病历，如果患者为手术分级管理目录中按四级管理的四级手术，统计实施四级手术、且【手术当日存在床旁交接班记录】的患者数量；同一患者同一次住院多次四级手术时分别判定，以手术日期与交接班记录日期一致为“手术当日”。每次四级手术具有交接班记录，输出为“1”，否则输出为“0”；无论结果输出为“1/0”，均给出相应理由。",
+    "denominator_prompt": "如果该患者存在四级手术（四级手术记录、四级介入治疗）输出结果为“1”，否则输出为“0”，均给出相应理由。",
+    "hospital_notes": "",
+    "prompt_sources": {
+      "numerator": "工作表1!E11",
+      "denominator": "工作表1!F11",
+      "notes": "工作表1!G11",
+      "hospital_notes": "工作表1!H11"
+    },
+    "unit": "四级手术患者",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B11:G11",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "admission",
+      "surgery",
+      "nursing"
+    ],
+    "page_categories": [
+      "cover",
+      "surgery",
+      "nursing"
+    ],
+    "counting_unit": "四级手术患者住院人次",
+    "period_anchor": "admission",
+    "rule_conflict": "定义按患者统计，分子提示按每次手术判定；采用住院人次内全部四级手术均符合，需医院确认。",
+    "external_requirements": [],
+    "fact_fields": {
+      "admission": {
+        "patient_id": "text",
+        "episode_id": "text",
+        "department": "text",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "surgery": {
+        "surgery_id": "text",
+        "procedure_name": "text",
+        "procedure_code": "text",
+        "grade": "int",
+        "end_time": "time",
+        "surgeon": "text",
+        "surgeon_id": "text",
+        "planned_surgeon": "text",
+        "planned_surgeon_id": "text",
+        "planned_procedure": "text",
+        "procedure_consistent": "bool",
+        "unplanned": "bool",
+        "reoperation": "bool",
+        "emergency_lifesaving": "bool",
+        "intraoperative_transfusion": "bool",
+        "autotransfusion": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "nursing": {
+        "nursing_type": "text",
+        "nursing_level": "text",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_11",
+    "name": "十一、非计划再次住院/手术患者疑难病例讨论完成率",
+    "definition": "对非计划再次住院/手术患者进行疑难病例讨论的数量占同期非计划再次住院/手术的数量的比例。",
+    "formula": "对非计划再次住院/手术患者进行疑难病例讨论的数量 ÷ 同期非计划再次住院/手术的数量 ×100%",
+    "notes": "反映疑难病例讨论制度落实和管理情况。\n需对接病案首页数据；先筛选出非计划再次住院、非计划再次手术病例",
+    "kind": "rate",
+    "numerator_prompt": "解析患者病历，如果患者为非计划再次住院、非计划再次手术病例，判断病历内是否存在正式疑难病例讨论记录的病例（需有完整疑难病例讨论文书），有则输出为“1”，否则输出为“0”；无论结果输出为“1/0”，均给出相应理由。",
+    "denominator_prompt": "如果该患者是非计划再次住院或非计划再次手术患者，输出结果为“1”，否则输出为“0”，均给出相应理由。",
+    "hospital_notes": "",
+    "prompt_sources": {
+      "numerator": "工作表1!E12",
+      "denominator": "工作表1!F12",
+      "notes": "工作表1!G12",
+      "hospital_notes": "工作表1!H12"
+    },
+    "unit": "再次住院/手术对象",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B12:G12",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "admission",
+      "readmission",
+      "surgery",
+      "discussion"
+    ],
+    "page_categories": [
+      "cover",
+      "admission",
+      "surgery",
+      "discussion",
+      "progress"
+    ],
+    "counting_unit": "住院病例",
+    "period_anchor": "admission",
+    "rule_conflict": null,
+    "external_requirements": [],
+    "fact_fields": {
+      "admission": {
+        "patient_id": "text",
+        "episode_id": "text",
+        "department": "text",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "readmission": {
+        "unplanned": "bool",
+        "previous_discharge_time": "time",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "surgery": {
+        "surgery_id": "text",
+        "procedure_name": "text",
+        "procedure_code": "text",
+        "grade": "int",
+        "end_time": "time",
+        "surgeon": "text",
+        "surgeon_id": "text",
+        "planned_surgeon": "text",
+        "planned_surgeon_id": "text",
+        "planned_procedure": "text",
+        "procedure_consistent": "bool",
+        "unplanned": "bool",
+        "reoperation": "bool",
+        "emergency_lifesaving": "bool",
+        "intraoperative_transfusion": "bool",
+        "autotransfusion": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "discussion": {
+        "discussion_type": "text",
+        "participants": "texts",
+        "departments": "texts",
+        "host": "text",
+        "host_role": "text",
+        "department": "text",
+        "organizer": "text",
+        "conclusion": "text",
+        "complete": "bool",
+        "completion_time": "time",
+        "planned_procedure": "text",
+        "planned_surgeon": "text",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_12",
+    "name": "十二、非计划再次住院/手术患者疑难病例讨论记录完整率",
+    "definition": "对非计划再次住院/手术患者进行疑难病例讨论并将讨论结论记入病历的数量占同期对非计划再次住院/手术患者进行疑难病例讨论的数量的比例。",
+    "formula": "对非计划再次住院/手术患者进行疑难病例讨论并将讨论结论记入病历的数量 ÷ 同期对非计划再次住院/手术患者进行疑难病例讨论的数量 ×100%",
+    "notes": "分子分母同口径：分母是已开展讨论的数量，分子是其中结论完整记入病历的数量。\n",
+    "kind": "rate",
+    "numerator_prompt": "解析患者病历，如果患者为非计划再次住院、非计划再次手术病例，判断病历内是否存在正式疑难病例讨论记录的病例（需有完整疑难病例讨论文书），有则输出为“1”，否则输出为“0”；无论结果输出为“1/0”，均给出相应理由。",
+    "denominator_prompt": "解析患者病历，如果患者为非计划再次住院、非计划再次手术病例，判断病历内是否进行疑难病例讨论，有则输出为“1”，否则输出为“0”；无论结果输出为“1/0”，均给出相应理由。",
+    "hospital_notes": "",
+    "prompt_sources": {
+      "numerator": "工作表1!E13",
+      "denominator": "工作表1!F13",
+      "notes": "工作表1!G13",
+      "hospital_notes": "工作表1!H13"
+    },
+    "unit": "讨论对象",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B13:G13",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "admission",
+      "readmission",
+      "surgery",
+      "discussion"
+    ],
+    "page_categories": [
+      "cover",
+      "admission",
+      "surgery",
+      "discussion",
+      "progress"
+    ],
+    "counting_unit": "住院病例",
+    "period_anchor": "admission",
+    "rule_conflict": "分子提示仅要求有讨论文书，定义还要求结论记入病历；采用结论完整性，需医院确认。",
+    "external_requirements": [],
+    "fact_fields": {
+      "admission": {
+        "patient_id": "text",
+        "episode_id": "text",
+        "department": "text",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "readmission": {
+        "unplanned": "bool",
+        "previous_discharge_time": "time",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "surgery": {
+        "surgery_id": "text",
+        "procedure_name": "text",
+        "procedure_code": "text",
+        "grade": "int",
+        "end_time": "time",
+        "surgeon": "text",
+        "surgeon_id": "text",
+        "planned_surgeon": "text",
+        "planned_surgeon_id": "text",
+        "planned_procedure": "text",
+        "procedure_consistent": "bool",
+        "unplanned": "bool",
+        "reoperation": "bool",
+        "emergency_lifesaving": "bool",
+        "intraoperative_transfusion": "bool",
+        "autotransfusion": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "discussion": {
+        "discussion_type": "text",
+        "participants": "texts",
+        "departments": "texts",
+        "host": "text",
+        "host_role": "text",
+        "department": "text",
+        "organizer": "text",
+        "conclusion": "text",
+        "complete": "bool",
+        "completion_time": "time",
+        "planned_procedure": "text",
+        "planned_surgeon": "text",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_13",
+    "name": "十三、高额异常费用患者进行疑难病例讨论的占比",
+    "definition": "对产生高额异常费用患者进行疑难病例讨论的数量占同期高额异常费用患者数量的比例。",
+    "formula": "对产生高额异常费用患者进行疑难病例讨论的数量 ÷ 同期高额异常费用患者数量 ×100%",
+    "notes": "按原文说明：高额异常费用患者指一个住院周期内产生的医疗费用在20万元以上的患者（各地可根据本辖区实际情况划定额度）。",
+    "kind": "rate",
+    "numerator_prompt": "解析病历，一个住院周期内总医疗费用≥20万元的患者，统计其中病历内存在疑难病例讨论记录的病例数量，",
+    "denominator_prompt": "如果患者住院费用≥20万元，输出结果为“1”，否则输出为“0”，均给出相应理由。",
+    "hospital_notes": "",
+    "prompt_sources": {
+      "numerator": "工作表1!E14",
+      "denominator": "工作表1!F14",
+      "notes": "工作表1!G14",
+      "hospital_notes": "工作表1!H14"
+    },
+    "unit": "异常费用患者",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B14:G14",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "admission",
+      "cost",
+      "discussion"
+    ],
+    "page_categories": [
+      "cover",
+      "discussion",
+      "discharge"
+    ],
+    "counting_unit": "住院病例",
+    "period_anchor": "admission",
+    "rule_conflict": null,
+    "external_requirements": [],
+    "fact_fields": {
+      "admission": {
+        "patient_id": "text",
+        "episode_id": "text",
+        "department": "text",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "cost": {
+        "total": "number",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "discussion": {
+        "discussion_type": "text",
+        "participants": "texts",
+        "departments": "texts",
+        "host": "text",
+        "host_role": "text",
+        "department": "text",
+        "organizer": "text",
+        "conclusion": "text",
+        "complete": "bool",
+        "completion_time": "time",
+        "planned_procedure": "text",
+        "planned_surgeon": "text",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_14",
+    "name": "十四、急危重症患者抢救成功率",
+    "definition": "急危重症患者抢救成功的例次数占同期急危重症患者抢救的总例次数的比例。",
+    "formula": "急危重症患者抢救成功的例次数 ÷ 同期急危重症患者抢救的总例次数 ×100%",
+    "notes": "按原文说明：抢救成功指急危重患者经抢救后存活超过24小时或存活至下一次抢救开始。",
+    "kind": "rate",
+    "numerator_prompt": "如果患者存在抢救医嘱，统计抢救医嘱例次中，抢救后【存活超过24小时，或存活至下一次抢救开始】的抢救例次数，则输出结果为“1”；每一次符合抢救成功统计1次，最终输出为累计抢救成功总次数，并说明结果依据。",
+    "denominator_prompt": "病历中含有1条抢救医嘱，则判定为成功1次，最终输出为累计总次数，并说明结果依据。",
+    "hospital_notes": "",
+    "prompt_sources": {
+      "numerator": "工作表1!E15",
+      "denominator": "工作表1!F15",
+      "notes": "工作表1!G15",
+      "hospital_notes": "工作表1!H15"
+    },
+    "unit": "抢救例次",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B15:G15",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "rescue",
+      "death",
+      "discharge"
+    ],
+    "page_categories": [
+      "orders",
+      "progress",
+      "nursing",
+      "discharge"
+    ],
+    "counting_unit": "抢救事件",
+    "period_anchor": "rescue",
+    "rule_conflict": "抢救医嘱条数可能不同于实际抢救例次；采用实际抢救事件，需医院确认。",
+    "external_requirements": [],
+    "fact_fields": {
+      "rescue": {
+        "rescue_id": "text",
+        "end_time": "time",
+        "survival_confirmed_until": "time",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "death": {
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "discharge": {
+        "nursing_level": "text",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_15",
+    "name": "十五、术前讨论完成率",
+    "definition": "完成术前讨论的手术例数占同期手术总例数的比例。",
+    "formula": "完成术前讨论的手术例数 ÷ 同期手术总例数 ×100%",
+    "notes": "按原文说明：除以抢救生命为目的的急诊手术外，术前讨论完成时间晚于手术医嘱开具时间和手术同意书签署时间的病例视为未完成。\n需对接病案首页数据；做是否为手术患者的判断",
+    "kind": "rate",
+    "numerator_prompt": "解析病历，如果该患者存在手术（存在手术记录、介入下治疗、内镜下治疗）、统计存在正式术前讨论记录文书的手术例数，一台手术对应一次术前讨论。除以抢救生命为目的的急诊手术外，术前讨论完成时间均早于手术医嘱开具时间和手术同意书签署时间的病例视为完成术前讨论，每一次完成统计1次，最终输出为累计总次数，并说明结果依据。",
+    "denominator_prompt": "如果该患者存在手术（存在手术记录、介入治疗、内镜下治疗），病历中含有1例手术，则判定为1例，最终输出为累计总手术例数，并说明结果依据。",
+    "hospital_notes": "",
+    "prompt_sources": {
+      "numerator": "工作表1!E16",
+      "denominator": "工作表1!F16",
+      "notes": "工作表1!G16",
+      "hospital_notes": "工作表1!H16"
+    },
+    "unit": "手术例次",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B16:G16",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "surgery",
+      "discussion",
+      "order",
+      "consent"
+    ],
+    "page_categories": [
+      "surgery",
+      "discussion",
+      "orders",
+      "consent"
+    ],
+    "counting_unit": "手术事件",
+    "period_anchor": "surgery",
+    "rule_conflict": null,
+    "external_requirements": [],
+    "fact_fields": {
+      "surgery": {
+        "surgery_id": "text",
+        "procedure_name": "text",
+        "procedure_code": "text",
+        "grade": "int",
+        "end_time": "time",
+        "surgeon": "text",
+        "surgeon_id": "text",
+        "planned_surgeon": "text",
+        "planned_surgeon_id": "text",
+        "planned_procedure": "text",
+        "procedure_consistent": "bool",
+        "unplanned": "bool",
+        "reoperation": "bool",
+        "emergency_lifesaving": "bool",
+        "intraoperative_transfusion": "bool",
+        "autotransfusion": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "discussion": {
+        "discussion_type": "text",
+        "participants": "texts",
+        "departments": "texts",
+        "host": "text",
+        "host_role": "text",
+        "department": "text",
+        "organizer": "text",
+        "conclusion": "text",
+        "complete": "bool",
+        "completion_time": "time",
+        "planned_procedure": "text",
+        "planned_surgeon": "text",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "order": {
+        "order_id": "text",
+        "order_category": "text",
+        "order_type": "text",
+        "content": "text",
+        "stop_time": "time",
+        "drug_name": "text",
+        "is_medication": "bool",
+        "event_date": "date",
+        "record_date": "date",
+        "stop_date": "date"
+      },
+      "consent": {
+        "consent_type": "text",
+        "physician_signed_time": "time",
+        "patient_signed_time": "time",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_16",
+    "name": "十六、术者参加术前讨论率",
+    "definition": "术者参加术前讨论的手术例数占同期进行术前讨论手术总例数的比例。",
+    "formula": "术者参加术前讨论的手术例数 ÷ 同期进行术前讨论手术总例数 ×100%",
+    "notes": "按原文说明：本指标中术者是指手术的主要完成人。",
+    "kind": "rate",
+    "numerator_prompt": "解析病历，如果该患者开展术前讨论的手术，且术前讨论记录中明确记载手术记录中手术指导者或手术者本人参与本次术前讨论的手术例数。每一次完成统计1次，最终输出为累计总次数，并说明结果依据。",
+    "denominator_prompt": "解析病历，如果该患者存在手术（存在手术记录、介入下治疗、内镜下治疗）、统计存在正式术前讨论记录文书的手术例数，一台手术对应一次术前讨论。除以抢救生命为目的的急诊手术外，术前讨论完成时间均早于手术医嘱开具时间和手术同意书签署时间的病例视为完成术前讨论，每一次完成统计1次，最终输出为累计总次数，并说明结果依据。",
+    "hospital_notes": "",
+    "prompt_sources": {
+      "numerator": "工作表1!E17",
+      "denominator": "工作表1!F17",
+      "notes": "工作表1!G17",
+      "hospital_notes": "工作表1!H17"
+    },
+    "unit": "已讨论手术例次",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B17:G17",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "surgery",
+      "discussion",
+      "order",
+      "consent"
+    ],
+    "page_categories": [
+      "surgery",
+      "discussion",
+      "orders",
+      "consent"
+    ],
+    "counting_unit": "已完成术前讨论的手术事件",
+    "period_anchor": "surgery",
+    "rule_conflict": null,
+    "external_requirements": [],
+    "fact_fields": {
+      "surgery": {
+        "surgery_id": "text",
+        "procedure_name": "text",
+        "procedure_code": "text",
+        "grade": "int",
+        "end_time": "time",
+        "surgeon": "text",
+        "surgeon_id": "text",
+        "planned_surgeon": "text",
+        "planned_surgeon_id": "text",
+        "planned_procedure": "text",
+        "procedure_consistent": "bool",
+        "unplanned": "bool",
+        "reoperation": "bool",
+        "emergency_lifesaving": "bool",
+        "intraoperative_transfusion": "bool",
+        "autotransfusion": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "discussion": {
+        "discussion_type": "text",
+        "participants": "texts",
+        "departments": "texts",
+        "host": "text",
+        "host_role": "text",
+        "department": "text",
+        "organizer": "text",
+        "conclusion": "text",
+        "complete": "bool",
+        "completion_time": "time",
+        "planned_procedure": "text",
+        "planned_surgeon": "text",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "order": {
+        "order_id": "text",
+        "order_category": "text",
+        "order_type": "text",
+        "content": "text",
+        "stop_time": "time",
+        "drug_name": "text",
+        "is_medication": "bool",
+        "event_date": "date",
+        "record_date": "date",
+        "stop_date": "date"
+      },
+      "consent": {
+        "consent_type": "text",
+        "physician_signed_time": "time",
+        "patient_signed_time": "time",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_17",
+    "name": "十七、术前讨论计划手术一致率",
+    "definition": "实际开展手术与术前讨论计划手术一致的手术例数占同期手术总例数的比例。",
+    "formula": "实际开展手术与术前讨论计划手术一致的手术例数 ÷ 同期手术总例数 ×100%",
+    "notes": "反映术前讨论质量。",
+    "kind": "rate",
+    "numerator_prompt": "解析病历，比对术前讨论记录中计划的手术名称、术式与手术记录实际实施术式，如果一致，统计1次，最终输出为累计总次数，并说明结果依据。",
+    "denominator_prompt": "如果该患者存在手术（存在手术记录、介入治疗、内镜下治疗），病历中含有1例手术，则判定为1例，最终输出为累计总手术例数，并说明结果依据。",
+    "hospital_notes": "",
+    "prompt_sources": {
+      "numerator": "工作表1!E18",
+      "denominator": "工作表1!F18",
+      "notes": "工作表1!G18",
+      "hospital_notes": "工作表1!H18"
+    },
+    "unit": "手术例次",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B18:G18",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "surgery",
+      "discussion"
+    ],
+    "page_categories": [
+      "surgery",
+      "discussion"
+    ],
+    "counting_unit": "手术事件",
+    "period_anchor": "surgery",
+    "rule_conflict": null,
+    "external_requirements": [],
+    "fact_fields": {
+      "surgery": {
+        "surgery_id": "text",
+        "procedure_name": "text",
+        "procedure_code": "text",
+        "grade": "int",
+        "end_time": "time",
+        "surgeon": "text",
+        "surgeon_id": "text",
+        "planned_surgeon": "text",
+        "planned_surgeon_id": "text",
+        "planned_procedure": "text",
+        "procedure_consistent": "bool",
+        "unplanned": "bool",
+        "reoperation": "bool",
+        "emergency_lifesaving": "bool",
+        "intraoperative_transfusion": "bool",
+        "autotransfusion": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "discussion": {
+        "discussion_type": "text",
+        "participants": "texts",
+        "departments": "texts",
+        "host": "text",
+        "host_role": "text",
+        "department": "text",
+        "organizer": "text",
+        "conclusion": "text",
+        "complete": "bool",
+        "completion_time": "time",
+        "planned_procedure": "text",
+        "planned_surgeon": "text",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_18",
+    "name": "十八、实际手术术者与计划手术术者一致率",
+    "definition": "实际开展手术术者与计划手术术者一致的手术例数占同期手术总例数的比例。",
+    "formula": "实际开展手术术者与计划手术术者一致的手术例数 ÷ 同期手术总例数 ×100%",
+    "notes": "反映手术管理的规范性。",
+    "kind": "rate",
+    "numerator_prompt": "解析病历，如果该患者开展术前讨论的手术，且术前讨论记录中明确记载手术记录中手术指导者或手术者本人参与本次术前讨论的手术例数。每一次完成统计1次，最终输出为累计总次数，并说明结果依据。",
+    "denominator_prompt": "如果该患者存在手术（存在手术记录、介入治疗、内镜下治疗），病历中含有1例手术，则判定为1例，最终输出为累计总手术例数，并说明结果依据。",
+    "hospital_notes": "",
+    "prompt_sources": {
+      "numerator": "工作表1!E19",
+      "denominator": "工作表1!F19",
+      "notes": "工作表1!G19",
+      "hospital_notes": "工作表1!H19"
+    },
+    "unit": "手术例次",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B19:G19",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "surgery",
+      "discussion"
+    ],
+    "page_categories": [
+      "surgery",
+      "discussion"
+    ],
+    "counting_unit": "手术事件",
+    "period_anchor": "surgery",
+    "rule_conflict": "分子提示复制了术者参与讨论的条件；采用计划与实际术者一致，需医院确认。",
+    "external_requirements": [],
+    "fact_fields": {
+      "surgery": {
+        "surgery_id": "text",
+        "procedure_name": "text",
+        "procedure_code": "text",
+        "grade": "int",
+        "end_time": "time",
+        "surgeon": "text",
+        "surgeon_id": "text",
+        "planned_surgeon": "text",
+        "planned_surgeon_id": "text",
+        "planned_procedure": "text",
+        "procedure_consistent": "bool",
+        "unplanned": "bool",
+        "reoperation": "bool",
+        "emergency_lifesaving": "bool",
+        "intraoperative_transfusion": "bool",
+        "autotransfusion": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "discussion": {
+        "discussion_type": "text",
+        "participants": "texts",
+        "departments": "texts",
+        "host": "text",
+        "host_role": "text",
+        "department": "text",
+        "organizer": "text",
+        "conclusion": "text",
+        "complete": "bool",
+        "completion_time": "time",
+        "planned_procedure": "text",
+        "planned_surgeon": "text",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_19",
+    "name": "十九、死亡病例讨论5日完成率",
+    "definition": "患者死亡5个工作日内完成死亡病例讨论的病例数量占同期死亡病例总数量的比例。",
+    "formula": "患者死亡5个工作日内完成死亡病例讨论的病例数量 ÷ 同期死亡病例总数量 ×100%",
+    "notes": "注意原文为“5个工作日”，不是自然日；工作日的计算需按法定工作日口径。\n工作日需要医院节假日/调休日历；缺日历时人工复核。",
+    "kind": "rate",
+    "numerator_prompt": "解析病历，读取死亡时间与死亡病例讨论记录时间，如果该病历自死亡时间起算【5个工作日内】完成死亡病例讨论、且病历存在正式死亡病例讨论记录，则输出为“1”，否则输出为“0”；无论结果输出为“1/0”，均给出相应理由。",
+    "denominator_prompt": "若患者存在死亡医嘱，则输出结果为“1”，否则输出为“0”，均给出相应理由。",
+    "hospital_notes": "",
+    "prompt_sources": {
+      "numerator": "工作表1!E20",
+      "denominator": "工作表1!F20",
+      "notes": "工作表1!G20",
+      "hospital_notes": "工作表1!H20"
+    },
+    "unit": "死亡病例",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B20:G20",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "death",
+      "discussion"
+    ],
+    "page_categories": [
+      "orders",
+      "progress",
+      "discussion",
+      "discharge"
+    ],
+    "counting_unit": "死亡病例",
+    "period_anchor": "death",
+    "rule_conflict": null,
+    "external_requirements": [
+      "医院工作日历"
+    ],
+    "fact_fields": {
+      "death": {
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "discussion": {
+        "discussion_type": "text",
+        "participants": "texts",
+        "departments": "texts",
+        "host": "text",
+        "host_role": "text",
+        "department": "text",
+        "organizer": "text",
+        "conclusion": "text",
+        "complete": "bool",
+        "completion_time": "time",
+        "planned_procedure": "text",
+        "planned_surgeon": "text",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_20",
+    "name": "二十、医务部门组织讨论的死亡病例与发生纠纷的死亡病例比值",
+    "definition": "医务部门组织进行死亡病例讨论的病例数量与同期发生医疗纠纷的死亡病例数量的比值。",
+    "formula": "医务部门组织进行死亡病例讨论的病例数量 ÷ 同期发生医疗纠纷的死亡病例数量（比值）",
+    "notes": "本指标为比值（不带×100%），不是百分比；统计组织主体为医务部门的死亡病例讨论。\n\n已纠正：分母是发生医疗纠纷的死亡病例数，不能使用全部死亡病例数。医务部门参与不等于组织。",
+    "kind": "ratio",
+    "numerator_prompt": "解析患者死亡病例讨论记录中，若存在医务部门人员参与，则输出为“1”，否则输出为“0”；无论结果输出为“1/0”，均给出相应理由。",
+    "denominator_prompt": "若患者存在死亡医嘱，则输出结果为“1”，否则输出为“0”，均给出相应理由。",
+    "hospital_notes": "此指标需要补充纠纷数据输入",
+    "prompt_sources": {
+      "numerator": "工作表1!E21",
+      "denominator": "工作表1!F21",
+      "notes": "工作表1!G21",
+      "hospital_notes": "工作表1!H21"
+    },
+    "unit": "死亡病例（不同集合）",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B21:G21",
+    "automation": "human_assisted",
+    "requires_external": true,
+    "fact_types": [
+      "death",
+      "discussion",
+      "dispute"
+    ],
+    "page_categories": [
+      "discussion",
+      "discharge",
+      "progress"
+    ],
+    "counting_unit": "两个死亡病例集合",
+    "period_anchor": "death",
+    "rule_conflict": "提示把死亡病例当分母、参与当组织；采用纠纷死亡病例和组织主体，需医院确认。",
+    "external_requirements": [
+      "纠纷死亡病例资料"
+    ],
+    "fact_fields": {
+      "death": {
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "discussion": {
+        "discussion_type": "text",
+        "participants": "texts",
+        "departments": "texts",
+        "host": "text",
+        "host_role": "text",
+        "department": "text",
+        "organizer": "text",
+        "conclusion": "text",
+        "complete": "bool",
+        "completion_time": "time",
+        "planned_procedure": "text",
+        "planned_surgeon": "text",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "dispute": {
+        "death_related": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_21",
+    "name": "二十一、科主任主持死亡病例讨论率",
+    "definition": "死亡病例讨论由科主任主持的病例数量占同期死亡病例总数量的比例。",
+    "formula": "死亡病例讨论由科主任主持的病例数量 ÷ 同期死亡病例总数量 ×100%",
+    "notes": "反映死亡病例讨论制度落实和管理情况。\n",
+    "kind": "rate",
+    "numerator_prompt": "解析病历，读取死亡病例讨论记录的主持人字段，如果该病历死亡病例讨论记录主持人为本科室科主任，则输出为“1”，否则输出为“0”；无论结果输出为“1/0”，均给出相应理由。",
+    "denominator_prompt": "若患者存在死亡医嘱，则输出结果为“1”，否则输出为“0”，均给出相应理由。",
+    "hospital_notes": "需对接病案首页数据，此指标需要科主任字段",
+    "prompt_sources": {
+      "numerator": "工作表1!E22",
+      "denominator": "工作表1!F22",
+      "notes": "工作表1!G22",
+      "hospital_notes": "工作表1!H22"
+    },
+    "unit": "死亡病例",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B22:G22",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "death",
+      "discussion"
+    ],
+    "page_categories": [
+      "discussion",
+      "progress",
+      "discharge"
+    ],
+    "counting_unit": "死亡病例",
+    "period_anchor": "death",
+    "rule_conflict": null,
+    "external_requirements": [
+      "科主任身份映射"
+    ],
+    "fact_fields": {
+      "death": {
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "discussion": {
+        "discussion_type": "text",
+        "participants": "texts",
+        "departments": "texts",
+        "host": "text",
+        "host_role": "text",
+        "department": "text",
+        "organizer": "text",
+        "conclusion": "text",
+        "complete": "bool",
+        "completion_time": "time",
+        "planned_procedure": "text",
+        "planned_surgeon": "text",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_22",
+    "name": "二十二、死亡患者病案上传率",
+    "definition": "按要求完整上传本机构死亡患者病案的数量占同期应上传死亡患者病案总数量的比例。",
+    "formula": "按要求完整上传本机构死亡患者病案的数量 ÷ 同期应上传死亡患者病案总数量 ×100%",
+    "notes": "按原文说明：应上传死亡患者病案指根据医院质量监测系统（HQMS）每月反馈各医疗机构须上传的死亡患者病案清单中的所有病案信息；本指标依赖病案系统上传日志。\n必须有应上传清单、实际完整上传结果；死亡医嘱不能证明上传完成。",
+    "kind": "rate",
+    "numerator_prompt": "若患者存在死亡医嘱，则输出结果为“1”，否则输出为“0”，均给出相应理由。",
+    "denominator_prompt": "若患者存在死亡医嘱，则输出结果为“1”，否则输出为“0”，均给出相应理由。",
+    "hospital_notes": "",
+    "prompt_sources": {
+      "numerator": "工作表1!E23",
+      "denominator": "工作表1!F23",
+      "notes": "工作表1!G23",
+      "hospital_notes": "工作表1!H23"
+    },
+    "unit": "应上传死亡病案",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B23:G23",
+    "automation": "human_assisted",
+    "requires_external": true,
+    "fact_types": [
+      "death",
+      "upload"
+    ],
+    "page_categories": [
+      "discharge",
+      "progress",
+      "orders"
+    ],
+    "counting_unit": "应上传死亡病案",
+    "period_anchor": "death",
+    "rule_conflict": "分子分母提示都只判断死亡；采用应上传名单和完整上传结果，需医院确认。",
+    "external_requirements": [
+      "应上传名单及完整上传结果"
+    ],
+    "fact_fields": {
+      "death": {
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "upload": {
+        "required": "bool",
+        "complete": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_23",
+    "name": "二十三、长期医嘱当日终止率",
+    "definition": "开具长期医嘱后当日终止执行的医嘱数量占同期开具长期医嘱总数量的比例。",
+    "formula": "开具长期医嘱后当日终止执行的医嘱数量 ÷ 同期开具长期医嘱总数量 ×100%",
+    "notes": "“当日”指医嘱开立自然日与停止执行自然日为同一天；反映查对制度落实和管理情况。",
+    "kind": "rate",
+    "numerator_prompt": "解析全部长期医嘱，起始日期与停止日期为同一个自然日的长期医嘱条数，则输出为“1”，否则输出为“0”；无论结果输出为“1/0”，均给出相应理由。",
+    "denominator_prompt": "统计该患者开具的全部长期医嘱总条数，输出为累计总条数，并说明结果依据。",
+    "hospital_notes": "",
+    "prompt_sources": {
+      "numerator": "工作表1!E24",
+      "denominator": "工作表1!F24",
+      "notes": "工作表1!G24",
+      "hospital_notes": "工作表1!H24"
+    },
+    "unit": "长期医嘱条目",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B24:G24",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "order"
+    ],
+    "page_categories": [
+      "orders"
+    ],
+    "counting_unit": "长期医嘱条目",
+    "period_anchor": "order",
+    "rule_conflict": null,
+    "external_requirements": [],
+    "fact_fields": {
+      "order": {
+        "order_id": "text",
+        "order_category": "text",
+        "order_type": "text",
+        "content": "text",
+        "stop_time": "time",
+        "drug_name": "text",
+        "is_medication": "bool",
+        "event_date": "date",
+        "record_date": "date",
+        "stop_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_24",
+    "name": "二十四、手术医师手术时间重合率",
+    "definition": "同一时间内手术医师为同一人的手术例数占同期住院患者手术总例数的比例。",
+    "formula": "同一时间内手术医师为同一人的手术例数 ÷ 同期住院患者手术总例数 ×100%",
+    "notes": "按原文说明：“同一时间”指手术未结束时间与其他手术开始时间重合（下同）。",
+    "kind": "rate",
+    "numerator_prompt": "输出为“0”",
+    "denominator_prompt": "如果该患者存在手术（存在手术记录、介入治疗、内镜下治疗），病历中含有1例手术，则判定为1例，最终输出为累计总手术例数，并说明结果依据。",
+    "hospital_notes": "需要本院手术管理目录\n需对接病案首页数据",
+    "prompt_sources": {
+      "numerator": "工作表1!E25",
+      "denominator": "工作表1!F25",
+      "notes": "工作表1!G25",
+      "hospital_notes": "工作表1!H25"
+    },
+    "unit": "手术例次",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B25:G25",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "surgery"
+    ],
+    "page_categories": [
+      "surgery"
+    ],
+    "counting_unit": "手术事件",
+    "period_anchor": "surgery",
+    "rule_conflict": "分子提示固定0；改为跨病例医师时间重合检测，需医院确认。",
+    "external_requirements": [],
+    "fact_fields": {
+      "surgery": {
+        "surgery_id": "text",
+        "procedure_name": "text",
+        "procedure_code": "text",
+        "grade": "int",
+        "end_time": "time",
+        "surgeon": "text",
+        "surgeon_id": "text",
+        "planned_surgeon": "text",
+        "planned_surgeon_id": "text",
+        "planned_procedure": "text",
+        "procedure_consistent": "bool",
+        "unplanned": "bool",
+        "reoperation": "bool",
+        "emergency_lifesaving": "bool",
+        "intraoperative_transfusion": "bool",
+        "autotransfusion": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_25",
+    "name": "二十五、麻醉医师手术时间重合率",
+    "definition": "同一时间内手术麻醉医师为同一人的手术例数占同期住院患者手术总例数的比例。",
+    "formula": "同一时间内手术麻醉医师为同一人的手术例数 ÷ 同期住院患者手术总例数 ×100%",
+    "notes": "判定逻辑同指标二十四（以麻醉未结束时间与其他麻醉开始时间重合为准）。",
+    "kind": "rate",
+    "numerator_prompt": "输出为“0”",
+    "denominator_prompt": "如果该患者存在手术（存在手术记录、介入治疗、内镜下治疗），病历中含有1例手术，则判定为1例，最终输出为累计总手术例数，并说明结果依据。",
+    "hospital_notes": "需要本院手术管理目录\n需对接病案首页数据",
+    "prompt_sources": {
+      "numerator": "工作表1!E26",
+      "denominator": "工作表1!F26",
+      "notes": "工作表1!G26",
+      "hospital_notes": "工作表1!H26"
+    },
+    "unit": "手术例次",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B26:G26",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "surgery",
+      "anesthesia"
+    ],
+    "page_categories": [
+      "surgery",
+      "anesthesia"
+    ],
+    "counting_unit": "手术事件",
+    "period_anchor": "surgery",
+    "rule_conflict": "分子提示固定0；改为跨病例麻醉时间重合检测，需医院确认。",
+    "external_requirements": [],
+    "fact_fields": {
+      "surgery": {
+        "surgery_id": "text",
+        "procedure_name": "text",
+        "procedure_code": "text",
+        "grade": "int",
+        "end_time": "time",
+        "surgeon": "text",
+        "surgeon_id": "text",
+        "planned_surgeon": "text",
+        "planned_surgeon_id": "text",
+        "planned_procedure": "text",
+        "procedure_consistent": "bool",
+        "unplanned": "bool",
+        "reoperation": "bool",
+        "emergency_lifesaving": "bool",
+        "intraoperative_transfusion": "bool",
+        "autotransfusion": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "anesthesia": {
+        "anesthesia_id": "text",
+        "end_time": "time",
+        "physician": "text",
+        "physician_id": "text",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_26",
+    "name": "二十六、四级手术与三级手术并发症发生率比",
+    "definition": "四级手术并发症发生率与三级手术并发症发生率的比。",
+    "formula": "四级手术与三级手术并发症发生率比 = 四级手术并发症发生率 : 三级手术并发症发生率（比值）",
+    "notes": "①三、四级手术指机构手术分级管理目录中的手术级别；②手术并发症包括：手术后肺栓塞、深静脉血栓、脓毒症、出血或血肿、伤口裂开、呼吸衰竭、生理/代谢紊乱、与手术/操作相关感染、手术过程中异物遗留、手术患者麻醉并发症、肺部感染与肺机能不全、手术意外穿刺伤或撕裂伤、手术后急性肾衰竭等；③先分别算出A、B两个率，再输出比值A:B。\n③可外挂本院手术管理知识库\n④需对接病案首页数据\n需后期进行数据特殊计算",
+    "kind": "rate_ratio",
+    "numerator_prompt": "解析患者病历，如果患者为手术分级管理目录中按四级管理的四级手术，统计实施四级手术、且患者存在与手术相关的手术并发症（手术后肺栓塞、深静脉血栓、脓毒症、出血或血肿、伤口裂开、呼吸衰竭、生理/代谢紊乱、与手术/操作相关感染、手术过程中异物遗留、手术患者麻醉并发症、肺部感染与肺机能不全、手术意外穿刺伤或撕裂伤、手术后急性肾衰竭等；），则输出为“1”，否则输出为“0”；无论结果输出为“1/0”，均给出相应理由。",
+    "denominator_prompt": "解析患者病历，如果患者为手术分级管理目录中按四级管理的三级手术，统计实施三级手术、且患者存在与手术相关的手术并发症（手术后肺栓塞、深静脉血栓、脓毒症、出血或血肿、伤口裂开、呼吸衰竭、生理/代谢紊乱、与手术/操作相关感染、手术过程中异物遗留、手术患者麻醉并发症、肺部感染与肺机能不全、手术意外穿刺伤或撕裂伤、手术后急性肾衰竭等；），则输出为“1”，否则输出为“0”；无论结果输出为“1/0”，均给出相应理由。",
+    "hospital_notes": "需要本院手术管理目录\n需对接病案首页数据",
+    "prompt_sources": {
+      "numerator": "工作表1!E27",
+      "denominator": "工作表1!F27",
+      "notes": "工作表1!G27",
+      "hospital_notes": "工作表1!H27"
+    },
+    "unit": "发生率之比",
+    "required_measures": [
+      "four_success",
+      "four_total",
+      "three_success",
+      "three_total"
+    ],
+    "source": "工作表1!B27:G27",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "surgery",
+      "complication"
+    ],
+    "page_categories": [
+      "cover",
+      "surgery",
+      "progress",
+      "discharge"
+    ],
+    "counting_unit": "手术事件",
+    "period_anchor": "surgery",
+    "rule_conflict": "提示仅给两个并发症计数；需要三级和四级各自分子、分母，需医院确认。",
+    "external_requirements": [
+      "医院手术分级目录"
+    ],
+    "fact_fields": {
+      "surgery": {
+        "surgery_id": "text",
+        "procedure_name": "text",
+        "procedure_code": "text",
+        "grade": "int",
+        "end_time": "time",
+        "surgeon": "text",
+        "surgeon_id": "text",
+        "planned_surgeon": "text",
+        "planned_surgeon_id": "text",
+        "planned_procedure": "text",
+        "procedure_consistent": "bool",
+        "unplanned": "bool",
+        "reoperation": "bool",
+        "emergency_lifesaving": "bool",
+        "intraoperative_transfusion": "bool",
+        "autotransfusion": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "complication": {
+        "diagnosis": "text",
+        "surgery_related": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_27",
+    "name": "二十七、四级手术与三级手术患者死亡率比",
+    "definition": "四级手术患者死亡率与三级手术患者死亡率的比。",
+    "formula": "四级手术与三级手术患者死亡率比 = 四级手术患者死亡率 : 三级手术患者死亡率（比值）",
+    "notes": "①各级手术患者死亡率为各级手术患者死亡人数占同期各级手术患者人数的比例；②先分别算出A、B两个率，再输出比值A:B。",
+    "kind": "rate_ratio",
+    "numerator_prompt": "解析患者病历，如果患者为手术分级管理目录中按四级管理的四级手术，统计实施四级手术、且存在死亡医嘱，则输出为“1”，否则输出为“0”；无论结果输出为“1/0”，均给出相应理由。",
+    "denominator_prompt": "解析患者病历，如果患者为手术分级管理目录中按三级管理的三级手术，统计实施三级手术、且存在死亡医嘱，则输出为“1”，否则输出为“0”；无论结果输出为“1/0”，均给出相应理由。",
+    "hospital_notes": "需要本院手术管理目录\n需对接病案首页数据",
+    "prompt_sources": {
+      "numerator": "工作表1!E28",
+      "denominator": "工作表1!F28",
+      "notes": "工作表1!G28",
+      "hospital_notes": "工作表1!H28"
+    },
+    "unit": "患者死亡率之比",
+    "required_measures": [
+      "four_success",
+      "four_total",
+      "three_success",
+      "three_total"
+    ],
+    "source": "工作表1!B28:G28",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "admission",
+      "surgery",
+      "death"
+    ],
+    "page_categories": [
+      "cover",
+      "surgery",
+      "discharge",
+      "progress"
+    ],
+    "counting_unit": "各级手术患者住院人次",
+    "period_anchor": "admission",
+    "rule_conflict": "提示仅给两个死亡计数；需要三级和四级各自患者总数；同次住院按最高手术级别归组，需医院确认。",
+    "external_requirements": [
+      "医院手术分级目录"
+    ],
+    "fact_fields": {
+      "admission": {
+        "patient_id": "text",
+        "episode_id": "text",
+        "department": "text",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "surgery": {
+        "surgery_id": "text",
+        "procedure_name": "text",
+        "procedure_code": "text",
+        "grade": "int",
+        "end_time": "time",
+        "surgeon": "text",
+        "surgeon_id": "text",
+        "planned_surgeon": "text",
+        "planned_surgeon_id": "text",
+        "planned_procedure": "text",
+        "procedure_consistent": "bool",
+        "unplanned": "bool",
+        "reoperation": "bool",
+        "emergency_lifesaving": "bool",
+        "intraoperative_transfusion": "bool",
+        "autotransfusion": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "death": {
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_28",
+    "name": "二十八、四级手术术前多学科讨论完成率",
+    "definition": "术前完成多学科讨论的四级手术例数占同期四级手术总例数的比例。",
+    "formula": "术前完成多学科讨论的四级手术例数 ÷ 同期四级手术总例数 ×100%",
+    "notes": "按原文说明：限制类技术按照四级手术进行管理。\n③可外挂本院手术管理知识库\n④需对接病案首页数据",
+    "kind": "rate",
+    "numerator_prompt": "解析患者病历，如果患者为手术分级管理目录中按四级管理的四级手术，统计实施四级手术、且术前讨论及术前小结结论记录中存在≥3个科室人员参与，则输出为“1”，否则输出为“0”；无论结果输出为“1/0”，均给出相应理由。",
+    "denominator_prompt": "解析患者病历，如果患者为手术分级管理目录中按四级管理的四级手术，统计实施三级手术，输出为总例数。",
+    "hospital_notes": "需要本院手术管理目录\n需对接病案首页数据",
+    "prompt_sources": {
+      "numerator": "工作表1!E29",
+      "denominator": "工作表1!F29",
+      "notes": "工作表1!G29",
+      "hospital_notes": "工作表1!H29"
+    },
+    "unit": "四级手术例次",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B29:G29",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "surgery",
+      "discussion"
+    ],
+    "page_categories": [
+      "cover",
+      "surgery",
+      "discussion"
+    ],
+    "counting_unit": "四级手术事件",
+    "period_anchor": "surgery",
+    "rule_conflict": "分母提示误写三级手术；采用四级手术，需医院确认。",
+    "external_requirements": [
+      "医院手术分级目录"
+    ],
+    "fact_fields": {
+      "surgery": {
+        "surgery_id": "text",
+        "procedure_name": "text",
+        "procedure_code": "text",
+        "grade": "int",
+        "end_time": "time",
+        "surgeon": "text",
+        "surgeon_id": "text",
+        "planned_surgeon": "text",
+        "planned_surgeon_id": "text",
+        "planned_procedure": "text",
+        "procedure_consistent": "bool",
+        "unplanned": "bool",
+        "reoperation": "bool",
+        "emergency_lifesaving": "bool",
+        "intraoperative_transfusion": "bool",
+        "autotransfusion": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "discussion": {
+        "discussion_type": "text",
+        "participants": "texts",
+        "departments": "texts",
+        "host": "text",
+        "host_role": "text",
+        "department": "text",
+        "organizer": "text",
+        "conclusion": "text",
+        "complete": "bool",
+        "completion_time": "time",
+        "planned_procedure": "text",
+        "planned_surgeon": "text",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_29",
+    "name": "二十九、三、四级手术实际开展率",
+    "definition": "实际开展的三、四级手术术种数占同期备案的三、四级手术术种数的比例。",
+    "formula": "实际开展的三、四级手术术种数 ÷ 同期备案的三、四级手术术种数 ×100%",
+    "notes": "①注意分子分母均为“术种数”（去重的手术种类），不是手术台次/例数；②按原文说明：三、四级手术备案指按《医疗机构手术分级管理办法》（国卫办医政发〔2022〕18号）要求向卫生健康行政部门报送本机构三、四级手术管理目录信息；③本指标依赖备案台账数据。\n③可外挂本院手术管理知识库\n④需对接病案首页数据",
+    "kind": "catalog_rate",
+    "numerator_prompt": "根据病案首页填写的三级、四级手术按术式名称去重，统计实际开展过的独立三、四级手术术种数量",
+    "denominator_prompt": "手上目录中三、四级手术术种数",
+    "hospital_notes": "需要本院手术管理目录\n需对接病案首页数据",
+    "prompt_sources": {
+      "numerator": "工作表1!E30",
+      "denominator": "工作表1!F30",
+      "notes": "工作表1!G30",
+      "hospital_notes": "工作表1!H30"
+    },
+    "unit": "术种",
+    "required_measures": [
+      "performed_types",
+      "registered_types"
+    ],
+    "source": "工作表1!B30:G30",
+    "automation": "human_assisted",
+    "requires_external": true,
+    "fact_types": [
+      "surgery"
+    ],
+    "page_categories": [
+      "cover",
+      "surgery"
+    ],
+    "counting_unit": "术种",
+    "period_anchor": "surgery",
+    "rule_conflict": null,
+    "external_requirements": [
+      "医院手术备案目录"
+    ],
+    "fact_fields": {
+      "surgery": {
+        "surgery_id": "text",
+        "procedure_name": "text",
+        "procedure_code": "text",
+        "grade": "int",
+        "end_time": "time",
+        "surgeon": "text",
+        "surgeon_id": "text",
+        "planned_surgeon": "text",
+        "planned_surgeon_id": "text",
+        "planned_procedure": "text",
+        "procedure_consistent": "bool",
+        "unplanned": "bool",
+        "reoperation": "bool",
+        "emergency_lifesaving": "bool",
+        "intraoperative_transfusion": "bool",
+        "autotransfusion": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_30",
+    "name": "三十、新技术新项目留存转化率",
+    "definition": "在四年的评估周期内，医院新增的技术项目在第四年继续开展的比例。",
+    "formula": "(A+C+E) ÷ (A+B+C+D+E+F) ×100%",
+    "notes": "①四年周期内以第一年技术项目种类数为基数，年度新增技术项目种类数=年度技术项目种类数-第一年技术项目种类数，考核第二年和第三年新增在第四年的继续开展情况；②A：第二年新增并在第三和第四年继续开展；B：第二年新增并只在第三年继续开展；C：第二年新增并只在第四年继续开展；D：第二年新增并未在第三和第四年继续开展；E：第三年新增并在第四年继续开展；F：第三年新增并未在第四年开展；③本指标主要依赖机构台账，病历仅用于校验项目是否实际开展。",
+    "kind": "retention",
+    "numerator_prompt": "读取新技术新项目管理台账，统计A+C+E的数量：A=第二年新增并在第三和第四年继续开展的技术项目；C=第二年新增并只在第四年继续开展的技术项目；E=第三年新增并在第四年继续开展的技术项目（用病历/手术或治疗记录校验项目在第四年确有实际开展）。",
+    "denominator_prompt": "读取台账，统计A+B+C+D+E+F的总数量，即第二年新增的所有技术项目（A+B+C+D）与第三年新增的所有技术项目（E+F）之和。",
+    "hospital_notes": "无法从病历中统计",
+    "prompt_sources": {
+      "numerator": "工作表1!E31",
+      "denominator": "工作表1!F31",
+      "notes": "工作表1!G31",
+      "hospital_notes": "工作表1!H31"
+    },
+    "unit": "项目种类",
+    "required_measures": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F"
+    ],
+    "source": "工作表1!B31:G31",
+    "automation": "human_assisted",
+    "requires_external": true,
+    "fact_types": [
+      "surgery"
+    ],
+    "page_categories": [
+      "surgery",
+      "progress"
+    ],
+    "counting_unit": "项目种类",
+    "period_anchor": "external",
+    "rule_conflict": null,
+    "external_requirements": [
+      "四年新技术新项目台账"
+    ],
+    "fact_fields": {
+      "surgery": {
+        "surgery_id": "text",
+        "procedure_name": "text",
+        "procedure_code": "text",
+        "grade": "int",
+        "end_time": "time",
+        "surgeon": "text",
+        "surgeon_id": "text",
+        "planned_surgeon": "text",
+        "planned_surgeon_id": "text",
+        "planned_procedure": "text",
+        "procedure_consistent": "bool",
+        "unplanned": "bool",
+        "reoperation": "bool",
+        "emergency_lifesaving": "bool",
+        "intraoperative_transfusion": "bool",
+        "autotransfusion": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_31",
+    "name": "三十一、危急值报告时间（中位数）",
+    "definition": "将出现危急值到临床科室获取危急值的时间，由长到短排序后取其中位数。",
+    "formula": "n为奇数时中位数=X(n+1)/2；n为偶数时中位数=(Xn/2+X(n/2)+1)/2",
+    "notes": "按原文说明：①n为实际报告的危急值项目数，X为出现危急值到临床科室获取危急值的时间；②分别计算住院、门诊、急诊危急值报告时间；③反映危急值上报效率。",
+    "kind": "median",
+    "numerator_prompt": "根据危急值报告系统中，取所有危急值报告-接收时间，输出结果为危急值处理时间，若一次住院存在多次危急值报告，则输出多次时间结果。",
+    "denominator_prompt": "对接危急值报告系统；统计时间后可按照科室划分",
+    "hospital_notes": "对接危急值报告系统；统计时间后可按照科室划分",
+    "prompt_sources": {
+      "numerator": "工作表1!E32",
+      "denominator": "工作表1!F32",
+      "notes": "工作表1!G32",
+      "hospital_notes": "工作表1!H32"
+    },
+    "unit": "分钟",
+    "required_measures": [
+      "minutes",
+      "eligible_total"
+    ],
+    "source": "工作表1!B32:G32",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "critical_value"
+    ],
+    "page_categories": [
+      "lab",
+      "imaging",
+      "progress",
+      "nursing"
+    ],
+    "counting_unit": "危急值条目时长",
+    "period_anchor": "critical_value",
+    "rule_conflict": null,
+    "external_requirements": [
+      "危急值出现和接收时间（PDF无记录时需导出）"
+    ],
+    "fact_fields": {
+      "critical_value": {
+        "critical_id": "text",
+        "item": "text",
+        "report_time": "time",
+        "received_time": "time",
+        "department": "text",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_32",
+    "name": "三十二、住院患者危急值当日及时处置率",
+    "definition": "当日处置的住院患者危急值项目数占同期临床科室接获住院患者危急值项目数的比例。",
+    "formula": "当日处置的住院患者危急值项目数 ÷ 同期临床科室接获住院患者危急值项目数 ×100%",
+    "notes": "按原文说明：①本指标只统计住院患者危急值处置情况，不包括门急诊患者危急值；②当日处置的危急值项目数以危急值出现当日的病程记录为准，若无记录则视为未处置。\n需要对接危急值报告系统",
+    "kind": "rate",
+    "numerator_prompt": "根据危急值报告系统中报告的危急值项目，存在相关的医嘱项目，且医嘱下达时间与危急值报告时间属于同一自然日，则输出为“1”，否则输出为“0”；无论结果输出为“1/0”，均给出相应理由。",
+    "denominator_prompt": "对接危急值报告系统；危急值报告项目数",
+    "hospital_notes": "对接危急值报告系统；危急值报告项目数",
+    "prompt_sources": {
+      "numerator": "工作表1!E33",
+      "denominator": "工作表1!F33",
+      "notes": "工作表1!G33",
+      "hospital_notes": "工作表1!H33"
+    },
+    "unit": "危急值条目",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B33:G33",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "critical_value",
+      "order",
+      "ward_round",
+      "progress_note"
+    ],
+    "page_categories": [
+      "lab",
+      "imaging",
+      "progress",
+      "orders",
+      "nursing"
+    ],
+    "counting_unit": "危急值条目",
+    "period_anchor": "critical_value",
+    "rule_conflict": "提示要求相关医嘱，备注要求当日病程记录；同时要求关联处置医嘱和病程证据，需医院确认。",
+    "external_requirements": [
+      "完整危急值明细（PDF无记录时需导出）"
+    ],
+    "fact_fields": {
+      "critical_value": {
+        "critical_id": "text",
+        "item": "text",
+        "report_time": "time",
+        "received_time": "time",
+        "department": "text",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "order": {
+        "order_id": "text",
+        "order_category": "text",
+        "order_type": "text",
+        "content": "text",
+        "stop_time": "time",
+        "drug_name": "text",
+        "is_medication": "bool",
+        "event_date": "date",
+        "record_date": "date",
+        "stop_date": "date"
+      },
+      "ward_round": {
+        "physician": "text",
+        "physician_role": "text",
+        "analysis": "text",
+        "plan": "text",
+        "severity": "text",
+        "norm_compliant": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "progress_note": {
+        "analysis": "text",
+        "plan": "text",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_33",
+    "name": "三十三、特殊使用级抗菌药物使用会诊率",
+    "definition": "特殊使用级抗菌药物使用医嘱与会诊记录相对应的医嘱数量占同期特殊使用级抗菌药物使用医嘱总数量的比例。",
+    "formula": "特殊使用级抗菌药物使用医嘱与会诊记录相对应的医嘱数量 ÷ 同期特殊使用级抗菌药物使用医嘱总数量 ×100%",
+    "notes": "按原文说明：①特殊使用级抗菌药物包括如第三、四代头孢菌素、碳青霉烯类、万古霉素等；②使用医嘱与会诊记录相对应指特殊使用级抗菌药物使用时经抗菌药物管理工作机构指定的专业技术人员会诊同意后，按程序合理使用抗菌药物。",
+    "kind": "rate",
+    "numerator_prompt": "解析患者医嘱及会诊申请单，若存在特殊使用级抗菌药物医嘱，且含有特殊使用级抗菌药物相关会诊申请单，则判定为符合1次，最终输出为累计总次数，并说明结果依据。",
+    "denominator_prompt": "医嘱中特殊使用级抗菌药物使用医嘱总条数。并说明结果依据。",
+    "hospital_notes": "需要提供特殊使用级抗菌药物名单",
+    "prompt_sources": {
+      "numerator": "工作表1!E34",
+      "denominator": "工作表1!F34",
+      "notes": "工作表1!G34",
+      "hospital_notes": "工作表1!H34"
+    },
+    "unit": "特殊级抗菌药物医嘱",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B34:G34",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "order",
+      "consultation"
+    ],
+    "page_categories": [
+      "orders",
+      "consultation",
+      "progress"
+    ],
+    "counting_unit": "特殊级抗菌药物医嘱条目",
+    "period_anchor": "order",
+    "rule_conflict": null,
+    "external_requirements": [
+      "医院特殊使用级抗菌药物名单"
+    ],
+    "fact_fields": {
+      "order": {
+        "order_id": "text",
+        "order_category": "text",
+        "order_type": "text",
+        "content": "text",
+        "stop_time": "time",
+        "drug_name": "text",
+        "is_medication": "bool",
+        "event_date": "date",
+        "record_date": "date",
+        "stop_date": "date"
+      },
+      "consultation": {
+        "consultation_id": "text",
+        "urgency": "text",
+        "arrival_time": "time",
+        "completion_time": "time",
+        "opinion": "text",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_34",
+    "name": "三十四、临床用血后评估记录率",
+    "definition": "输血治疗后规范书写评估输血记录例次数占同期临床输血治疗病例总例次数的比例。",
+    "formula": "输血治疗后规范书写评估输血记录例次数 ÷ 同期临床输血治疗病例总例次数 ×100%",
+    "notes": "反映临床用血治疗的规范性。",
+    "kind": "rate",
+    "numerator_prompt": "解析输血医嘱，若输血医嘱在同时间段内病程记录中含有相关的评估记录，则判定为符合1次，最终输出为累计总次数，并说明结果依据。",
+    "denominator_prompt": "医嘱中输血医嘱总条数。并说明结果依据。",
+    "hospital_notes": "需要输血系统数据",
+    "prompt_sources": {
+      "numerator": "工作表1!E35",
+      "denominator": "工作表1!F35",
+      "notes": "工作表1!G35",
+      "hospital_notes": "工作表1!H35"
+    },
+    "unit": "输血例次",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B35:G35",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "transfusion",
+      "transfusion_assessment"
+    ],
+    "page_categories": [
+      "orders",
+      "progress",
+      "nursing"
+    ],
+    "counting_unit": "输血治疗事件",
+    "period_anchor": "transfusion",
+    "rule_conflict": "提示按医嘱条数统计，定义按输血治疗例次；采用实际输血事件，需医院确认。",
+    "external_requirements": [],
+    "fact_fields": {
+      "transfusion": {
+        "transfusion_id": "text",
+        "end_time": "time",
+        "intraoperative": "bool",
+        "autologous": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "transfusion_assessment": {
+        "assessment": "text",
+        "norm_compliant": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  },
+  {
+    "id": "core_35",
+    "name": "三十五、术中自体血回输率",
+    "definition": "术中使用自体血回输的患者数量占同期术中进行输血患者总数量的比例。",
+    "formula": "术中使用自体血回输的患者数量 ÷ 同期术中进行输血患者总数量 ×100%",
+    "notes": "反映临床用血管理情况。",
+    "kind": "rate",
+    "numerator_prompt": "对接输血系统，查询是否为术中自体血回输患者，若是则输出为“1”，否则输出为“0”；无论结果输出为“1/0”，均给出相应理由。",
+    "denominator_prompt": "解析病历，手术记录中含有术中输血相关描述，则输出为“1”，否则输出为“0”；无论结果输出为“1/0”，均给出相应理由。",
+    "hospital_notes": "需要对接输血系统数据",
+    "prompt_sources": {
+      "numerator": "工作表1!E36",
+      "denominator": "工作表1!F36",
+      "notes": "工作表1!G36",
+      "hospital_notes": "工作表1!H36"
+    },
+    "unit": "术中输血患者",
+    "required_measures": [
+      "numerator",
+      "denominator"
+    ],
+    "source": "工作表1!B36:G36",
+    "automation": "human_assisted",
+    "requires_external": false,
+    "fact_types": [
+      "admission",
+      "surgery",
+      "transfusion"
+    ],
+    "page_categories": [
+      "surgery",
+      "anesthesia",
+      "orders",
+      "progress"
+    ],
+    "counting_unit": "术中输血患者住院人次",
+    "period_anchor": "admission",
+    "rule_conflict": null,
+    "external_requirements": [
+      "自体血回输证据（PDF无记录时需输血资料）"
+    ],
+    "fact_fields": {
+      "admission": {
+        "patient_id": "text",
+        "episode_id": "text",
+        "department": "text",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "surgery": {
+        "surgery_id": "text",
+        "procedure_name": "text",
+        "procedure_code": "text",
+        "grade": "int",
+        "end_time": "time",
+        "surgeon": "text",
+        "surgeon_id": "text",
+        "planned_surgeon": "text",
+        "planned_surgeon_id": "text",
+        "planned_procedure": "text",
+        "procedure_consistent": "bool",
+        "unplanned": "bool",
+        "reoperation": "bool",
+        "emergency_lifesaving": "bool",
+        "intraoperative_transfusion": "bool",
+        "autotransfusion": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      },
+      "transfusion": {
+        "transfusion_id": "text",
+        "end_time": "time",
+        "intraoperative": "bool",
+        "autologous": "bool",
+        "event_date": "date",
+        "record_date": "date"
+      }
+    }
+  }
+]

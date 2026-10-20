@@ -1,0 +1,35 @@
+{
+  "indicator_set": "core",
+  "calculation_engine": "core35",
+  "extraction_mode": "rules",
+  "hospital_reference_file": null,
+  "high_cost_threshold": 200000,
+  "data_dir": "data",
+  "work_dir": "work",
+  "report_dir": "outputs/reports",
+  "ocr": {
+    "device": "gpu:0",
+    "dpi": 250,
+    "index_dpi": 180,
+    "version": "PP-OCRv6",
+    "detection_name": "PP-OCRv6_medium_det",
+    "recognition_name": "PP-OCRv6_medium_rec",
+    "detection_dir": "models/PP-OCRv6_medium_det",
+    "recognition_dir": "models/PP-OCRv6_medium_rec",
+    "orientation_dir": "models/PP-LCNet_x1_0_doc_ori",
+    "low_score": 0.85
+  },
+  "transfer_time_basis": "record_time",
+  "icu_departments": ["ICU", "CCU", "RICU", "SICU", "NICU", "PICU", "EICU", "MICU", "重症医学科", "重症监护室"],
+  "llm": {
+    "enabled": false,
+    "protocol": "openai",
+    "base_url": "http://127.0.0.1:11434/v1",
+    "model": "请填写你部署的本地模型名称",
+    "timeout_seconds": 180,
+    "max_chars_per_page": 4000,
+    "max_output_tokens": 4096,
+    "context_tokens": 16384,
+    "fact_types_per_request": 4
+  }
+}

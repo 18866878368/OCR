@@ -1,0 +1,139 @@
+# 本地批量病案 OCR 与 35 项核心制度指标
+
+输入病例专用目录或多个 PDF，保存 OCR、临床事实、事件关联和证据，再由规则计算提交病例集合的指标。未复核初判与已复核结果分开显示。
+
+## 已实现
+
+- 持久化批量队列、后台处理、停止/继续、页面与语义块缓存；单份失败不阻断其余病例。
+- PDF 文字层提取、扫描页 PaddleOCR、页面分类；批处理默认识别全册，数据库保存本地 PDF 快照。
+- 规则优先：按明确的文书标题、字段标签、医嘱列标题提取候选，区分开立、执行、停止与记录时间；用明确业务编号关联事件。
+- 可选本机语义辅助：仅处理规则未解决的事实类型及关联；不替换同一事件已有的规则值。院方 Excel 的分子、分母提取指导已纳入辅助提示词与界面。
+- 35 项规则计算：事件/住院人次计数、医师时间重合、三级/四级发生率比、术种去重、新项目留存、中位数。
+- 中文字段复核、人工关联、对象完整性核查、口径确认、医院补充明细与汇总值导入、修改审计。
+- JSON、Excel 可打开的 CSV：指标汇总、逐病例/事件判定、事实证据、处理检查点。
+
+**规则实现不代表所有病例都能自动得到 35 个可靠数值。** 默认无需启动 Ollama。当前规则适用于明确标签和列标题，复杂叙述、OCR 错位及完整对象枚举仍需辅助或人工核查。PDF 没有记载的备案目录、工作日历、病案上传结果、新技术台账等需要医院补充。空值表示缺失、未核实或不适用，不能改成 0。
+
+## 当前验证范围
+
+本机 Conda medocr 环境已跑通 GPU OCR，93 项自动检查通过。规则模式在 168 页真实病例副本上复用了全部 OCR，提取 35 条规则候选，生成 35 项指标记录；模型调用为 0，二次处理命中全部 168 页规则缓存，人工复核记录保留。当前证据不足，35 项数值保持未知。记录见 work/rule_first_acceptance/acceptance_summary.json。此前全文语义试运行发现证据与字段支持问题，尚未完成医院准确率验收；详见 [网页简化与病例测试记录](网页简化与病例测试记录.md)。
+
+默认输出 core_01—core_35。目录中的 16 项附加诊疗指标保留，可通过 indicator_set: "all" 启用人工/补充计算；它们不属于本次 35 项自动规则范围。
+
+## 启动
+
+~~~powershell
+conda activate medocr
+Set-Location -LiteralPath 'F:\医疗质量管理\OCR'
+python -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501 --browser.gatherUsageStats false --server.maxUploadSize 512
+~~~
+
+浏览器访问 http://127.0.0.1:8501。也可运行 start.ps1，脚本优先使用已激活的 medocr 环境。
+
+## 医生使用流程
+
+1. 在“处理病例”选择一份或多份病例 PDF，点击“导入病例”。也可展开路径栏，填写单份病例路径或专用病例目录。一个 PDF 默认代表一次住院。
+2. 默认不勾选“使用本机语义模型辅助疑难片段（可选）”，点击“开始处理”。系统在本机完成全册 OCR、规则提取与 35 项初判；无需 Ollama。需要处理疑难片段时勾选辅助，模型不可用时仍完成规则提取并提示辅助待重试。
+3. 点击“查看 35 项指标”。默认显示自动初判，切换可查看已复核结果。缺少条件时显示待补充；不完整的分子、分母会明确标注。
+4. 需要检查证据时进入“核对与复核”，依次核对原文、事实和指标。这里保留对象完整性确认、口径确认、补充资料和同次住院合并。
+5. 模型连接、医院参考目录及诊断记录集中放在“设置”。已配置的本机模型不用每次填写。下载汇总 CSV，或展开完整导出保存证据明细。
+
+一份病例即可测试流程，结果仅代表提交病例范围。病例内没有记载的院方台账、目录和上传状态仍需要补充。
+
+## 命令行批处理
+
+先确认环境，不读取病例也不下载模型：
+
+~~~powershell
+python -m medocr doctor
+python -m medocr specs
+~~~
+
+如界面已保存设置，命令行需要显式指定 config.local.json：
+
+~~~powershell
+python -m medocr --config config.local.json run --input 'F:\病例专用目录' --batch-name '月度病例' --start 2025-04-01 --end 2025-04-30
+~~~
+
+也可先入队再处理。将 BATCH_ID 换成入队返回的真实批次 ID：
+
+~~~powershell
+python -m medocr --config config.local.json queue --input 'F:\病例专用目录' --batch-name '月度病例' --start 2025-04-01 --end 2025-04-30
+python -m medocr --config config.local.json process-batch --batch BATCH_ID
+python -m medocr --config config.local.json jobs --batch BATCH_ID
+python -m medocr --config config.local.json stop --batch BATCH_ID
+python -m medocr --config config.local.json report --batch BATCH_ID
+~~~
+
+以上默认规则模式。需要本机语义辅助时，在 run 或 process-batch 命令末尾添加 --llm。停止在当前页面或模型请求完成后生效。再次 process-batch 会继续；成功页面/块使用缓存。模型、参考资料或代码版本变化会重新评估提取缓存，人工复核记录保留。
+
+## 医院资料格式
+
+参考模板：examples/hospital_reference.template.json。名单只有写入 complete_sections 才作为完整名单使用；空模板不表示医院没有这些对象。
+
+事实补充支持 UTF-8 CSV 或 JSON 数组，每条包含 case_id、kind、event_time、record_time、attributes。CSV 的 attributes 单元格填 JSON。资料快照保存在本地，并记录来源行。
+
+~~~json
+[
+  {
+    "case_id": "替换为本批次真实病例ID",
+    "kind": "upload",
+    "event_time": null,
+    "record_time": null,
+    "attributes": {"required": true, "complete": true}
+  }
+]
+~~~
+
+~~~powershell
+python -m medocr --config config.local.json import-facts --batch BATCH_ID --file '医院补充明细.json' --reviewer '复核人'
+~~~
+
+默认不直接确认事实；--verified 只用于医院已经逐条核实的明细。汇总数值导入支持 import-measures，明确标注为人工补充结果。
+
+## 计算和证据
+
+~~~mermaid
+flowchart LR
+  A[一批病例PDF] --> B[本地OCR及页面分类]
+  B --> C[规则提取明确字段和编号关联]
+  C --> S[可选本机语义辅助疑难片段]
+  S --> D
+  C --> D[35项规则与初判]
+  H[医院目录及台账] --> D
+  C --> E[原页证据与医生复核]
+  E --> F[对象完整性及口径确认]
+  F --> G[已复核指标与明细导出]
+  D --> G
+~~~
+
+同一患者可以贡献多次会诊、手术或医嘱。分子分母来自对象判定后汇总，不要求 PDF 出现“入院48小时内转科患者人次数”这个统计字段。
+
+输出位于 outputs/reports/<批次ID>/。summary.csv 中 draft_* 是初判，value 是已复核结果；details.csv 标明 calculation_mode、理由、事实 ID 与证据。report.json 包含结果、提取模式、统计范围、配置与疑似重复住院提示；facts.json 保存候选及复核信息，eligible_in_mode 标明是否可用于当前模式。历史未复核模型候选在规则模式中不参与计算，但仍保留供核查；医生已确认的记录继续保留。处理完所有页面不能证明临床事件已完整枚举，需医生确认对象完整性。
+
+35 项要素契约：outputs/core_specs.json。实现与补充要求：[35项指标实现说明](35项指标实现说明.md)。
+
+### 当前候选与历史隔离
+
+自动计算、自动关联和导出使用同一份当前来源清单：OCR 原文与分类、规则版本、辅助分块、模型配置及医院参考资料必须匹配，且对应提取块已成功保存。切换模式、重分块、修改配置或重新 OCR 后，不匹配的自动候选保留为历史记录，不再进入当前计算。相同来源和配置的成功缓存仍可复用，无需重新调用模型；强制重提取以该块最新成功输出为准，失败或处理中输出不会被当作成功结果。
+
+旧数据库无需清空或重跑 OCR，打开页面就会按当前来源清单筛选。事实复核页默认显示当前候选和可用的已复核事实，勾选“查看历史及已隔离候选”可查询隔离原因；历史候选不会进入批量确认。医生逐条核对后可显式确认历史事实，原有人工复核记录保留；来源已变化的记录仍须重新复核。
+
+导出的 facts.json/csv 包含所有历史证据，并用 eligible_in_mode、candidate_scope、scope_reason、scope_run_id 标记当前可用性和来源清单。processing.json 附 current_scopes；extraction_plans、extraction_outputs 保存提取来源清单及成功输出 ID，供本地审计。
+
+### 删除以前的记录
+
+在“设置 → 记录管理”中选择批次和删除范围，核对显示的数量后勾选“我已核对上述范围，确认删除”再点击删除按钮。
+
+- **历史自动候选**：删除旧规则、旧模型和旧正则候选，保留当前来源清单可用的候选、人工录入、已经复核或修改的记录，以及被人工关联/指标复核引用的候选。规则模式下可复用的当前语义缓存也会保留。清理后自动更新本批次导出报告。
+- **整个批次**：删除此批次的复核、完整性确认、补充统计、处理记录和生成的导出报告。仅此批次使用的住院资料、OCR 和候选记录一并从数据库删除；与其他批次共用的病例资料保留。
+
+存在正在处理的相关批次时不允许删除。默认在 data/deletion_backups 中保存删除前的 SQLite 数据库和该批次旧导出，可取消备份；备份包含病案信息，应按医院授权保存。原始 PDF、上传副本、页面图片、模型和操作日志保留，此功能不执行病案文件的彻底擦除。
+
+## 数据与配置
+
+病案快照、数据库在 data/，页图和上传副本在 work/，报告在 outputs/reports/。这些文件仍含患者信息，程序不自动脱敏或加密，使用医院授权本地存储。Streamlit 默认只监听回环地址并关闭使用统计。
+
+模型接口禁用代理与重定向，拒绝外部地址及含 cloud 的模型名称。Ollama 需按环境说明关闭云功能；本机服务必须确实使用下载到本机的权重。运行病例时 OCR 不自动下载模型。
+
+不需要 HIS 接入，但全院资料完整性不能仅靠输入 PDF 推断。先由医生标注一小批具有阳性、阴性和缺失情况的病例，对字段准确率、事件召回、时间语义、分子分母和遗漏状态逐项验收，再扩大批量。

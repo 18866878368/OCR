@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "medocr-local"
+version = "0.1.0"
+description = "Local medical-record OCR, evidence review and indicator calculations"
+requires-python = ">=3.11,<3.14"
+dependencies = ["pypdf>=5,<7", "PyMuPDF>=1.25,<2", "Pillow>=11,<13", "streamlit>=1.42,<2"]
+
+[project.optional-dependencies]
+ocr = ["paddleocr>=3.7,<4"]
+catalog = ["openpyxl>=3.1,<4"]
+
+[project.scripts]
+medocr = "medocr.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["medocr*"]
+
+[tool.setuptools.package-data]
+medocr = ["catalog.json"]

@@ -1,0 +1,6 @@
+[
+  {"metric_id":"core_20","measure":"numerator","value":3,"source":"演示数据，须替换：医务部门组织死亡病例讨论台账，同一统计期"},
+  {"metric_id":"core_20","measure":"denominator","value":2,"source":"演示数据，须替换：发生医疗纠纷的死亡病例清单，同一统计期"},
+  {"metric_id":"core_31","measure":"minutes","value":[5,8,12],"source":"演示数据，须替换：危急值报告与临床接获时间差，单位分钟"},
+  {"metric_id":"core_31","measure":"eligible_total","value":3,"source":"演示数据，须替换：完整危急值条目总数"}
+]

@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+data/
+work/
+models/
+outputs/reports/
+output/
+tmp/
+*.egg-info/
+.pytest_cache/
+config.local.json
+*.pdf
+*.xlsx
+*.sqlite
+*.sqlite-*
