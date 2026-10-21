@@ -10,12 +10,12 @@ from .store import digest, stamp
 from .runtime_paths import native_model_dir
 
 TAGS = [
-    ('transfer', r'转科记录|转出记录|转入记录'),
+    ('transfer', r'转科记录|转科时间|转出记录|转出时间|转入记录|转入时间'),
     ('admission', r'入院记录|入院情况|首次病程'),
     ('cover', r'病案首页|住院病案首'),
     ('discharge', r'出院记录|出院小结'),
     ('death', r'死亡记录|死亡小结'),
-    ('orders', r'长期医嘱|临时医嘱|医嘱单'),
+    ('orders', r'长期医嘱|临时医嘱|医嘱单|开立时间|医嘱开具时间'),
     ('consultation', r'会诊记录|会诊申请'),
     ('discussion', r'讨论记录|术前讨论|疑难病例讨论|死亡病例讨论'),
     ('surgery', r'手术记录|手术安全核查'),

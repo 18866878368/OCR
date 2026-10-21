@@ -14,13 +14,15 @@ def signature(value):
 
 def rule_signature(page, config):
     from .rule_extract import RULE_EXTRACT_VERSION
-    return signature([RULE_EXTRACT_VERSION, page['text'], page['category'], config.get('icu_departments', [])])
+    from .retrieval import RETRIEVAL_VERSION
+    return signature([RULE_EXTRACT_VERSION, RETRIEVAL_VERSION, page['text'], page['category'], config.get('icu_departments', [])])
 
 
 def semantic_chunk(units, config):
     from .facts import VERSION
+    from .retrieval import RETRIEVAL_VERSION
     key = '|'.join(f"{u['document_id']}:{u['page']}:{u['offset']}" for u in units)
-    return key, signature([VERSION, units, config['llm'], config.get('hospital_reference', {})])
+    return key, signature([VERSION, RETRIEVAL_VERSION, units, config['llm'], config.get('hospital_reference', {})])
 
 
 def link_signature(events, config):

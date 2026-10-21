@@ -6,11 +6,12 @@ import re
 
 from .rules import aggregate, automatic_case, calculate_measures, in_period, parse_time, RULE_VERSION
 from .specs import core_specs
+from .retrieval import RETRIEVAL_VERSION
 
 
 def rule_hash(spec):
     return hashlib.sha256(json.dumps([spec['id'],spec['rule_conflict'],spec['counting_unit'],
-                                     RULE_VERSION],ensure_ascii=False).encode()).hexdigest()
+                                     RULE_VERSION, RETRIEVAL_VERSION],ensure_ascii=False).encode()).hexdigest()
 
 
 def all_of(values):
@@ -295,10 +296,17 @@ def case_items(number, ctx):
         return rows
     if number==9:
         surgery_exists = True if surgeries else (False if ctx.complete else None)
-        levels = {e['attributes'].get('nursing_level') for e in ctx.get('discharge') if e['attributes'].get('nursing_level')}
-        level = next(iter(levels)) if len(levels)==1 else None
+        # The supplied guide locates the last nursing level in long-term orders.
+        # Prefer the latest dated long-term order, then use an explicit discharge field as fallback.
+        orders = [e for e in ctx.get('order') if e['attributes'].get('order_type')=='long' and e['attributes'].get('nursing_level')]
+        ordered = sorted(orders, key=lambda e: parse_time(e.get('event_time')) or datetime.min)
+        level = ordered[-1]['attributes'].get('nursing_level') if ordered else None
+        if level is None:
+            levels = {e['attributes'].get('nursing_level') for e in ctx.get('discharge') if e['attributes'].get('nursing_level')}
+            level = next(iter(levels)) if len(levels)==1 else None
         n = any(x in level for x in ('特级','一级','1级','I级')) if level else None
-        return [ctx.case_row(n,'按出院时护理级别判定',surgery_exists,surgeries+ctx.get('discharge'),'discharge')]
+        evidence_events = surgeries + orders + ctx.get('discharge')
+        return [ctx.case_row(n,'按长期医嘱中出院前最后护理级别判定',surgery_exists,evidence_events,'admission')]
     if number==10:
         graded = [e for e in surgeries if ctx.grade(e)==4]
         d = True if graded else (None if any(ctx.grade(e) is None for e in surgeries) or not ctx.complete else False)

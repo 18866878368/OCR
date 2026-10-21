@@ -34,6 +34,19 @@ def show_extraction_guidance(metric):
         spec = next((s for s in core_specs() if s['id']==metric['id']),None)
         if spec:
             st.caption('所需要素：'+', '.join(FACT_LABELS[k] for k in spec['fact_types'])+'；计数单位：'+spec['counting_unit'])
+            plan = spec.get('retrieval', {})
+            if plan:
+                st.markdown('**文书定位与字段**')
+                for source in plan.get('sources', []):
+                    docs = '、'.join(source.get('document_types', [])) or '当前指标相关文书'
+                    fields = '、'.join(source.get('target_fields', [])) or '待定义'
+                    aliases = '、'.join(source.get('aliases', []))
+                    st.write(f'从【{docs}】提取：{fields}' + (f'；标题/字段别名：{aliases}' if aliases else ''))
+                calc = plan.get('calculation_rules', {})
+                if calc:
+                    st.caption('判定规则：'+json.dumps(calc,ensure_ascii=False))
+                if plan.get('conflicts'):
+                    st.warning('待确认口径：'+'；'.join(plan['conflicts']))
             if spec['external_requirements']:
                 st.caption('补充资料要求：'+'；'.join(spec['external_requirements']))
         else:

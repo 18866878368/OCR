@@ -1,12 +1,13 @@
 """Core indicator contracts. Hospital prompt text remains preserved in catalog.json."""
 from .rules import catalog
+from .retrieval import RETRIEVAL_VERSION, retrieval_plan
 
 # Types describe facts, never an LLM-computed numerator or denominator.
 FIELDS = {
     'admission': {'patient_id':'text', 'episode_id':'text', 'department':'text'},
     'discharge': {'nursing_level':'text'},
     'transfer': {'occurred':'bool','from_department':'text','to_department':'text','from_icu':'bool','to_icu':'bool'},
-    'order': {'order_id':'text','order_category':'text','order_type':'text','content':'text','stop_time':'time','drug_name':'text','is_medication':'bool'},
+    'order': {'order_id':'text','order_category':'text','order_type':'text','content':'text','stop_time':'time','drug_name':'text','nursing_level':'text','is_medication':'bool'},
     'ward_round': {'physician':'text','physician_role':'text','analysis':'text','plan':'text','severity':'text','norm_compliant':'bool'},
     'progress_note': {'analysis':'text','plan':'text'},
     'consultation': {'consultation_id':'text','urgency':'text','arrival_time':'time','completion_time':'time','opinion':'text'},
@@ -124,8 +125,11 @@ def core_specs():
             continue
         n = int(m['id'][-2:])
         kinds, pages, unit, anchor = CONTRACTS[n]
-        result.append({**m,'fact_types':kinds,'page_categories':pages,'counting_unit':unit,
+        enriched = {**m,'fact_types':kinds,'page_categories':pages,'unit':unit,
+                    'fact_fields':{k:FIELDS[k] for k in kinds}}
+        result.append({**enriched,'counting_unit':unit,
                        'period_anchor':anchor,'rule_conflict':CONFLICTS.get(n),
+                       'retrieval_version':RETRIEVAL_VERSION,'retrieval':retrieval_plan(m['id'],enriched),
                        'external_requirements':EXTERNAL.get(n,[]),
                        'fact_fields':{k:FIELDS[k] for k in kinds}})
     return result

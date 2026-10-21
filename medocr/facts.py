@@ -7,6 +7,7 @@ import urllib.request
 from .extract import candidate_events, times_in, local_endpoint, NoRedirect
 from .rules import canonical_time
 from .specs import FIELDS, RELATIONS, core_specs
+from .retrieval import RETRIEVAL_VERSION
 from .errors import ProcessingStopped
 from .dates import date_values, canonical_date, composed_times
 from .candidate_scope import rule_signature, semantic_chunk, current_scope, scoped_events, link_signature
@@ -456,8 +457,10 @@ def extract_facts_case(store, case_id, config, use_llm=False, progress=None, for
                 # Each original hospital guide is assigned once to its principal fact type.
                 guidance = [m for m in relevant if m['fact_types'][0] in group]
                 content = {'hospital_extraction_guidance':[{'id':m['id'],'numerator':m['numerator_prompt'],
-                           'denominator':m['denominator_prompt'],'normalized_requirements':m['fact_fields'],
+                           'denominator':m['denominator_prompt'],'retrieval':m.get('retrieval'),
+                           'normalized_requirements':m['fact_fields'],
                            'rule_conflict':m['rule_conflict']} for m in guidance], 'pages':units,
+                           'retrieval_rules_version': RETRIEVAL_VERSION,
                                'hospital_ward_round_standard':config.get('hospital_reference',{}).get('ward_round_standard'),
                            'rule_first_instruction':'规则已先提取明确字段。本次仅辅助未解决的事实类型；不要改变有原文依据的规则值，不得推断完整枚举或阴性。'}
                 source_pages = {(u['document_id'],u['page']) for u in units}

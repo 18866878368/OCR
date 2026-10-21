@@ -11,7 +11,7 @@ from .dates import canonical_date, composed_times, DATE, CLOCK
 from .extract import times_in
 from .specs import RELATIONS
 
-RULE_EXTRACT_VERSION = 'labelled-facts-v1'
+RULE_EXTRACT_VERSION = 'labelled-facts-v2-expert-guided'
 
 # Each anchor starts one record; subsequent anchors of that type start another.
 ANCHORS = {
@@ -54,7 +54,7 @@ TIME_LABELS = {
 TEXT_FIELDS = {
     'admission': {'patient_id':r'患者编号|患者ID','episode_id':r'住院号|住院编号','department':r'入院科室'},
     'transfer': {'from_department':r'转出科室','to_department':r'转入科室'},
-    'order': {'order_id':r'医嘱编号|医嘱ID','content':r'医嘱内容','drug_name':r'药品名称'},
+    'order': {'order_id':r'医嘱编号|医嘱ID','content':r'医嘱内容','drug_name':r'药品名称','nursing_level':r'护理级别'},
     'consultation': {'consultation_id':r'会诊编号|会诊申请单号','opinion':r'会诊意见'},
     'surgery': {'surgery_id':r'手术编号','procedure_name':r'手术名称|术式','procedure_code':r'手术编码',
                 'surgeon':r'术者|主刀医师','surgeon_id':r'术者编号','planned_surgeon':r'计划术者',
@@ -200,6 +200,10 @@ def rule_facts(page, config=None):
                 attrs['occurred'] = True
             attrs.update(from_icu=icu_value(from_dep,config),to_icu=icu_value(to_dep,config))
         if kind=='order':
+            # The supplied guide locates the last nursing level in long-term orders.
+            # Preserve the labelled value as raw evidence; later rules choose the last one.
+            if 'nursing_level' not in attrs:
+                attrs['nursing_level'] = literal(quote,r'护理级别')
             typ = literal(quote,r'医嘱类型')
             attrs['order_type'] = {'长期':'long','临时':'temporary'}.get(typ,'unknown')
             category = literal(quote,r'医嘱类别')
@@ -208,6 +212,13 @@ def rule_facts(page, config=None):
                 headings = {v for label,v in [('长期医嘱','long'),('临时医嘱','temporary')] if label in text[:500]}
                 if len(headings)==1:
                     attrs['order_type'] = next(iter(headings))
+        if kind=='ward_round':
+            # A titled主任/副主任/主治查房记录 is evidence of the role candidate.
+            # It does not certify clinical completeness; norm_compliant stays unknown.
+            head = quote.splitlines()[0] if quote.splitlines() else quote
+            role = re.search(r'(主任医师|副主任医师|主治医师)', head)
+            if role and not attrs.get('physician_role'):
+                attrs['physician_role'] = role.group(1)
         if kind=='consultation':
             attrs['urgency'] = {'急会诊':'emergency','急':'emergency','普通':'ordinary','普通会诊':'ordinary'}.get(literal(quote,r'会诊类型'),'unknown')
         if kind=='surgery':

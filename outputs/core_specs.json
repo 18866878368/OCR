@@ -35,10 +35,6 @@
       "orders",
       "nursing"
     ],
-    "counting_unit": "住院人次",
-    "period_anchor": "admission",
-    "rule_conflict": null,
-    "external_requirements": [],
     "fact_fields": {
       "admission": {
         "patient_id": "text",
@@ -56,7 +52,106 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "住院人次",
+    "period_anchor": "admission",
+    "rule_conflict": null,
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [
+            "入院记录"
+          ],
+          "page_categories": [
+            "admission",
+            "cover"
+          ],
+          "event_types": [
+            "admission"
+          ],
+          "target_fields": [
+            "event_time"
+          ],
+          "aliases": [
+            "入院时间",
+            "入院日期"
+          ]
+        },
+        {
+          "document_types": [
+            "病程记录",
+            "转科记录",
+            "转入记录",
+            "转出记录"
+          ],
+          "page_categories": [
+            "progress",
+            "transfer"
+          ],
+          "event_types": [
+            "transfer"
+          ],
+          "target_fields": [
+            "record_time",
+            "occurred",
+            "from_department",
+            "to_department",
+            "from_icu",
+            "to_icu"
+          ],
+          "aliases": [
+            "转科记录",
+            "转入记录",
+            "转出记录",
+            "记录时间",
+            "文书记录时间"
+          ]
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "transfer"
+        ],
+        "fields": [
+          "admission.event_time",
+          "transfer.record_time",
+          "transfer.occurred",
+          "transfer.from_department",
+          "transfer.to_department"
+        ],
+        "conditions": [
+          "转科记录时间在入院后48小时内",
+          "排除转入或转出ICU"
+        ],
+        "counting_unit": "住院人次"
+      },
+      "denominator": {
+        "fields": [
+          "admission.event_time"
+        ],
+        "conditions": [
+          "每次住院纳入1个分母"
+        ],
+        "counting_unit": "住院人次"
+      },
+      "calculation_rules": {
+        "time_window_hours": 48,
+        "time_basis": "transfer.record_time",
+        "exclude": [
+          "from_icu",
+          "to_icu"
+        ],
+        "deduplicate_by": "episode_id"
+      },
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [
+        "文档明确使用入院记录和病程/转科记录；必须保留原文页码和记录时间证据。"
+      ],
+      "conflicts": []
+    },
+    "external_requirements": []
   },
   {
     "id": "core_02",
@@ -91,10 +186,6 @@
       "admission",
       "orders"
     ],
-    "counting_unit": "住院人次",
-    "period_anchor": "admission",
-    "rule_conflict": null,
-    "external_requirements": [],
     "fact_fields": {
       "admission": {
         "patient_id": "text",
@@ -110,12 +201,104 @@
         "content": "text",
         "stop_time": "time",
         "drug_name": "text",
+        "nursing_level": "text",
         "is_medication": "bool",
         "event_date": "date",
         "record_date": "date",
         "stop_date": "date"
       }
-    }
+    },
+    "counting_unit": "住院人次",
+    "period_anchor": "admission",
+    "rule_conflict": null,
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [
+            "入院记录"
+          ],
+          "page_categories": [
+            "admission",
+            "cover"
+          ],
+          "event_types": [
+            "admission"
+          ],
+          "target_fields": [
+            "event_time"
+          ],
+          "aliases": [
+            "入院时间",
+            "入院日期"
+          ]
+        },
+        {
+          "document_types": [
+            "临时医嘱",
+            "医嘱记录"
+          ],
+          "page_categories": [
+            "orders"
+          ],
+          "event_types": [
+            "order"
+          ],
+          "target_fields": [
+            "event_time",
+            "order_category",
+            "content",
+            "order_type"
+          ],
+          "aliases": [
+            "临时医嘱",
+            "医嘱内容",
+            "开立时间",
+            "医嘱开具时间"
+          ]
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "order"
+        ],
+        "fields": [
+          "admission.event_time",
+          "order.event_time",
+          "order.order_category",
+          "order.content"
+        ],
+        "conditions": [
+          "首次检查或治疗医嘱开具时间在入院后8小时内"
+        ],
+        "counting_unit": "住院人次"
+      },
+      "denominator": {
+        "fields": [
+          "admission.event_time"
+        ],
+        "conditions": [
+          "每次住院纳入1个分母"
+        ],
+        "counting_unit": "住院人次"
+      },
+      "calculation_rules": {
+        "time_window_hours": 8,
+        "time_basis": "order.event_time",
+        "allowed_order_categories": [
+          "examination",
+          "treatment"
+        ],
+        "deduplicate_by": "episode_id"
+      },
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [
+        "指标名称虽含查房，文档定义实际使用检查或治疗医嘱。"
+      ],
+      "conflicts": []
+    },
+    "external_requirements": []
   },
   {
     "id": "core_03",
@@ -133,7 +316,7 @@
       "notes": "工作表1!G4",
       "hospital_notes": "工作表1!H4"
     },
-    "unit": "病例",
+    "unit": "住院病例",
     "required_measures": [
       "numerator",
       "denominator"
@@ -149,10 +332,6 @@
       "admission",
       "progress"
     ],
-    "counting_unit": "住院病例",
-    "period_anchor": "admission",
-    "rule_conflict": null,
-    "external_requirements": [],
     "fact_fields": {
       "admission": {
         "patient_id": "text",
@@ -171,7 +350,91 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "住院病例",
+    "period_anchor": "admission",
+    "rule_conflict": null,
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [
+            "病程记录",
+            "主任医师查房记录",
+            "副主任医师查房记录",
+            "主治医师查房记录"
+          ],
+          "page_categories": [
+            "progress",
+            "admission"
+          ],
+          "event_types": [
+            "ward_round"
+          ],
+          "target_fields": [
+            "event_time",
+            "physician",
+            "physician_role",
+            "analysis",
+            "plan",
+            "severity",
+            "norm_compliant"
+          ],
+          "aliases": [
+            "主任医师查房记录",
+            "副主任医师查房记录",
+            "主治医师查房记录",
+            "查房时间",
+            "病情分析",
+            "处置意见",
+            "诊疗意见"
+          ]
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "ward_round"
+        ],
+        "fields": [
+          "ward_round.event_time",
+          "ward_round.physician_role",
+          "ward_round.analysis",
+          "ward_round.plan",
+          "ward_round.norm_compliant"
+        ],
+        "conditions": [
+          "主治医师及以上",
+          "每条查房记录有时间、病情分析和诊疗处置意见",
+          "按患者病情分级核对完整性"
+        ],
+        "counting_unit": "住院病例"
+      },
+      "denominator": {
+        "fields": [
+          "admission.event_time"
+        ],
+        "conditions": [
+          "每次住院纳入1个病例分母"
+        ],
+        "counting_unit": "住院病例"
+      },
+      "calculation_rules": {
+        "required_fields": [
+          "event_time",
+          "physician_role",
+          "analysis",
+          "plan"
+        ],
+        "all_records_must_pass": true
+      },
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [
+        "记录标题可以作为医师身份候选，但仍需保留原文并人工确认规范性。"
+      ],
+      "conflicts": []
+    },
+    "external_requirements": []
   },
   {
     "id": "core_04",
@@ -208,10 +471,6 @@
       "progress",
       "discussion"
     ],
-    "counting_unit": "住院人次",
-    "period_anchor": "admission",
-    "rule_conflict": null,
-    "external_requirements": [],
     "fact_fields": {
       "admission": {
         "patient_id": "text",
@@ -240,7 +499,98 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "住院人次",
+    "period_anchor": "admission",
+    "rule_conflict": null,
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [
+            "首次病程记录",
+            "入院记录",
+            "病程记录"
+          ],
+          "page_categories": [
+            "admission",
+            "progress"
+          ],
+          "event_types": [
+            "progress_note"
+          ],
+          "target_fields": [
+            "plan"
+          ],
+          "aliases": [
+            "首次病程记录",
+            "诊疗计划",
+            "手术计划"
+          ]
+        },
+        {
+          "document_types": [
+            "手术记录",
+            "介入治疗记录",
+            "内镜下治疗记录"
+          ],
+          "page_categories": [
+            "surgery"
+          ],
+          "event_types": [
+            "surgery"
+          ],
+          "target_fields": [
+            "event_time",
+            "procedure_name",
+            "unplanned"
+          ],
+          "aliases": [
+            "手术记录",
+            "介入治疗",
+            "内镜下治疗",
+            "是否非计划手术"
+          ]
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "surgery"
+        ],
+        "fields": [
+          "progress_note.plan",
+          "surgery.event_time",
+          "surgery.procedure_name",
+          "surgery.unplanned"
+        ],
+        "conditions": [
+          "先核对首次病程诊疗计划",
+          "仅在明确语义证据支持时判定非计划手术"
+        ],
+        "counting_unit": "住院人次"
+      },
+      "denominator": {
+        "fields": [
+          "admission.event_time"
+        ],
+        "conditions": [
+          "每次住院纳入1个分母"
+        ],
+        "counting_unit": "住院人次"
+      },
+      "calculation_rules": {
+        "planned_source": "progress_note.plan",
+        "actual_source": "surgery",
+        "require_semantic_confirmation": true
+      },
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [
+        "没有手术计划的缺失证据不能单独证明非计划手术。"
+      ],
+      "conflicts": []
+    },
+    "external_requirements": []
   },
   {
     "id": "core_05",
@@ -258,7 +608,7 @@
       "notes": "工作表1!G6",
       "hospital_notes": "工作表1!H6"
     },
-    "unit": "急会诊次数",
+    "unit": "急会诊事件",
     "required_measures": [
       "numerator",
       "denominator"
@@ -273,10 +623,6 @@
       "consultation",
       "progress"
     ],
-    "counting_unit": "急会诊事件",
-    "period_anchor": "consultation",
-    "rule_conflict": null,
-    "external_requirements": [],
     "fact_fields": {
       "consultation": {
         "consultation_id": "text",
@@ -287,7 +633,74 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "急会诊事件",
+    "period_anchor": "consultation",
+    "rule_conflict": null,
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [
+            "会诊记录",
+            "急会诊申请单"
+          ],
+          "page_categories": [
+            "consultation",
+            "progress"
+          ],
+          "event_types": [
+            "consultation"
+          ],
+          "target_fields": [
+            "event_time",
+            "consultation_id",
+            "urgency",
+            "arrival_time"
+          ],
+          "aliases": [
+            "急会诊",
+            "会诊申请时间",
+            "到位时间",
+            "到达时间"
+          ]
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "consultation"
+        ],
+        "fields": [
+          "consultation.event_time",
+          "consultation.arrival_time",
+          "consultation.urgency"
+        ],
+        "conditions": [
+          "会诊类型为急会诊",
+          "请求发出后10分钟内到位"
+        ],
+        "counting_unit": "急会诊次数"
+      },
+      "denominator": {
+        "fields": [
+          "consultation.consultation_id"
+        ],
+        "conditions": [
+          "每份急会诊申请单计1次"
+        ],
+        "counting_unit": "急会诊次数"
+      },
+      "calculation_rules": {
+        "time_window_minutes": 10,
+        "time_basis": "consultation.event_time_to_arrival_time",
+        "deduplicate_by": "consultation_id"
+      },
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": []
   },
   {
     "id": "core_06",
@@ -305,7 +718,7 @@
       "notes": "工作表1!G7",
       "hospital_notes": "工作表1!H7"
     },
-    "unit": "急会诊次数",
+    "unit": "急会诊事件",
     "required_measures": [
       "numerator",
       "denominator"
@@ -322,10 +735,6 @@
       "orders",
       "progress"
     ],
-    "counting_unit": "急会诊事件",
-    "period_anchor": "consultation",
-    "rule_conflict": null,
-    "external_requirements": [],
     "fact_fields": {
       "consultation": {
         "consultation_id": "text",
@@ -343,12 +752,104 @@
         "content": "text",
         "stop_time": "time",
         "drug_name": "text",
+        "nursing_level": "text",
         "is_medication": "bool",
         "event_date": "date",
         "record_date": "date",
         "stop_date": "date"
       }
-    }
+    },
+    "counting_unit": "急会诊事件",
+    "period_anchor": "consultation",
+    "rule_conflict": null,
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [
+            "会诊记录",
+            "急会诊申请单"
+          ],
+          "page_categories": [
+            "consultation",
+            "progress"
+          ],
+          "event_types": [
+            "consultation"
+          ],
+          "target_fields": [
+            "event_time",
+            "consultation_id",
+            "urgency",
+            "opinion"
+          ],
+          "aliases": [
+            "急会诊",
+            "会诊申请时间",
+            "会诊意见"
+          ]
+        },
+        {
+          "document_types": [
+            "临时医嘱",
+            "医嘱记录"
+          ],
+          "page_categories": [
+            "orders"
+          ],
+          "event_types": [
+            "order"
+          ],
+          "target_fields": [
+            "event_time",
+            "content",
+            "order_id"
+          ],
+          "aliases": [
+            "临时医嘱",
+            "医嘱内容",
+            "开立时间"
+          ]
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "consultation",
+          "order"
+        ],
+        "fields": [
+          "consultation.consultation_id",
+          "consultation.event_time",
+          "consultation.opinion",
+          "order.event_time",
+          "order.content"
+        ],
+        "conditions": [
+          "急会诊申请后40分钟内",
+          "医嘱内容与会诊意见对应"
+        ],
+        "counting_unit": "急会诊次数"
+      },
+      "denominator": {
+        "fields": [
+          "consultation.consultation_id"
+        ],
+        "conditions": [
+          "每份急会诊申请单计1次"
+        ],
+        "counting_unit": "急会诊次数"
+      },
+      "calculation_rules": {
+        "time_window_minutes": 40,
+        "relation": "implements_consultation",
+        "deduplicate_by": "consultation_id"
+      },
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": []
   },
   {
     "id": "core_07",
@@ -366,7 +867,7 @@
       "notes": "工作表1!G8",
       "hospital_notes": "工作表1!H8"
     },
-    "unit": "普通会诊次数",
+    "unit": "普通会诊事件",
     "required_measures": [
       "numerator",
       "denominator"
@@ -381,10 +882,6 @@
       "consultation",
       "progress"
     ],
-    "counting_unit": "普通会诊事件",
-    "period_anchor": "consultation",
-    "rule_conflict": "分子提示写急会诊10分钟，定义要求普通会诊24小时完成；采用定义，需医院确认。",
-    "external_requirements": [],
     "fact_fields": {
       "consultation": {
         "consultation_id": "text",
@@ -395,7 +892,76 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "普通会诊事件",
+    "period_anchor": "consultation",
+    "rule_conflict": "分子提示写急会诊10分钟，定义要求普通会诊24小时完成；采用定义，需医院确认。",
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [
+            "会诊记录",
+            "普通会诊申请单"
+          ],
+          "page_categories": [
+            "consultation",
+            "progress"
+          ],
+          "event_types": [
+            "consultation"
+          ],
+          "target_fields": [
+            "event_time",
+            "consultation_id",
+            "urgency",
+            "completion_time"
+          ],
+          "aliases": [
+            "普通会诊",
+            "会诊申请时间",
+            "会诊完成时间",
+            "电子签章时间"
+          ]
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "consultation"
+        ],
+        "fields": [
+          "consultation.event_time",
+          "consultation.completion_time",
+          "consultation.urgency"
+        ],
+        "conditions": [
+          "会诊类型为普通会诊",
+          "申请后24小时内完成，以电子签章时间为完成时间"
+        ],
+        "counting_unit": "普通会诊次数"
+      },
+      "denominator": {
+        "fields": [
+          "consultation.consultation_id"
+        ],
+        "conditions": [
+          "每份普通会诊申请单计1次"
+        ],
+        "counting_unit": "普通会诊次数"
+      },
+      "calculation_rules": {
+        "time_window_hours": 24,
+        "time_basis": "consultation.event_time_to_completion_time",
+        "deduplicate_by": "consultation_id"
+      },
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": [
+        "文档截图中出现10分钟字样，指标定义和表格说明使用24小时；当前按24小时执行，待医院确认。"
+      ]
+    },
+    "external_requirements": []
   },
   {
     "id": "core_08",
@@ -413,7 +979,7 @@
       "notes": "工作表1!G9",
       "hospital_notes": "工作表1!H9"
     },
-    "unit": "普通会诊次数",
+    "unit": "普通会诊事件",
     "required_measures": [
       "numerator",
       "denominator"
@@ -430,10 +996,6 @@
       "orders",
       "progress"
     ],
-    "counting_unit": "普通会诊事件",
-    "period_anchor": "consultation",
-    "rule_conflict": "分母的“患者总次数”与按申请单计次存在歧义；采用会诊事件，需医院确认。",
-    "external_requirements": [],
     "fact_fields": {
       "consultation": {
         "consultation_id": "text",
@@ -451,12 +1013,106 @@
         "content": "text",
         "stop_time": "time",
         "drug_name": "text",
+        "nursing_level": "text",
         "is_medication": "bool",
         "event_date": "date",
         "record_date": "date",
         "stop_date": "date"
       }
-    }
+    },
+    "counting_unit": "普通会诊事件",
+    "period_anchor": "consultation",
+    "rule_conflict": "分母的“患者总次数”与按申请单计次存在歧义；采用会诊事件，需医院确认。",
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [
+            "会诊记录",
+            "普通会诊申请单"
+          ],
+          "page_categories": [
+            "consultation",
+            "progress"
+          ],
+          "event_types": [
+            "consultation"
+          ],
+          "target_fields": [
+            "event_time",
+            "consultation_id",
+            "urgency",
+            "opinion"
+          ],
+          "aliases": [
+            "普通会诊",
+            "会诊申请时间",
+            "会诊意见"
+          ]
+        },
+        {
+          "document_types": [
+            "临时医嘱",
+            "医嘱记录"
+          ],
+          "page_categories": [
+            "orders"
+          ],
+          "event_types": [
+            "order"
+          ],
+          "target_fields": [
+            "event_time",
+            "content",
+            "order_id"
+          ],
+          "aliases": [
+            "临时医嘱",
+            "医嘱内容",
+            "开立时间"
+          ]
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "consultation",
+          "order"
+        ],
+        "fields": [
+          "consultation.consultation_id",
+          "consultation.event_time",
+          "consultation.opinion",
+          "order.event_time",
+          "order.content"
+        ],
+        "conditions": [
+          "普通会诊申请后24小时内",
+          "医嘱内容与会诊意见对应"
+        ],
+        "counting_unit": "普通会诊次数"
+      },
+      "denominator": {
+        "fields": [
+          "consultation.consultation_id"
+        ],
+        "conditions": [
+          "普通会诊患者/申请单计数口径需确认"
+        ],
+        "counting_unit": "普通会诊次数"
+      },
+      "calculation_rules": {
+        "time_window_hours": 24,
+        "relation": "implements_consultation",
+        "deduplicate_by": "consultation_id"
+      },
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": [
+        "定义写普通会诊患者总次数，提示按申请单计次；当前按会诊事件保存，待医院确认。"
+      ]
+    },
+    "external_requirements": []
   },
   {
     "id": "core_09",
@@ -474,7 +1130,7 @@
       "notes": "工作表1!G10",
       "hospital_notes": "工作表1!H10"
     },
-    "unit": "手术患者",
+    "unit": "手术患者住院人次",
     "required_measures": [
       "numerator",
       "denominator"
@@ -494,10 +1150,6 @@
       "orders",
       "nursing"
     ],
-    "counting_unit": "手术患者住院人次",
-    "period_anchor": "discharge",
-    "rule_conflict": null,
-    "external_requirements": [],
     "fact_fields": {
       "admission": {
         "patient_id": "text",
@@ -531,7 +1183,107 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "手术患者住院人次",
+    "period_anchor": "discharge",
+    "rule_conflict": null,
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [
+            "长期医嘱",
+            "医嘱记录"
+          ],
+          "page_categories": [
+            "orders",
+            "discharge"
+          ],
+          "event_types": [
+            "order"
+          ],
+          "target_fields": [
+            "event_time",
+            "stop_time",
+            "order_type",
+            "nursing_level",
+            "content"
+          ],
+          "aliases": [
+            "长期医嘱",
+            "护理级别",
+            "特级护理",
+            "一级护理",
+            "停止时间"
+          ]
+        },
+        {
+          "document_types": [
+            "手术记录",
+            "介入治疗记录",
+            "内镜下治疗记录"
+          ],
+          "page_categories": [
+            "surgery"
+          ],
+          "event_types": [
+            "surgery"
+          ],
+          "target_fields": [
+            "event_time",
+            "procedure_name"
+          ],
+          "aliases": [
+            "手术记录",
+            "介入治疗",
+            "内镜下治疗"
+          ]
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "order",
+          "surgery"
+        ],
+        "fields": [
+          "order.order_type",
+          "order.event_time",
+          "order.stop_time",
+          "order.nursing_level",
+          "surgery.event_time"
+        ],
+        "conditions": [
+          "存在手术",
+          "出院前最后一次护理级别为特级或一级"
+        ],
+        "counting_unit": "手术患者住院人次"
+      },
+      "denominator": {
+        "fields": [
+          "surgery.event_time"
+        ],
+        "conditions": [
+          "存在手术即纳入分母"
+        ],
+        "counting_unit": "手术患者住院人次"
+      },
+      "calculation_rules": {
+        "last_value_before": "discharge",
+        "allowed_nursing_levels": [
+          "特级护理",
+          "一级护理",
+          "1级护理",
+          "I级护理"
+        ]
+      },
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [
+        "按文档从长期医嘱寻找出院前最后护理级别；缺失时保留待核验。"
+      ],
+      "conflicts": []
+    },
+    "external_requirements": []
   },
   {
     "id": "core_10",
@@ -549,7 +1301,7 @@
       "notes": "工作表1!G11",
       "hospital_notes": "工作表1!H11"
     },
-    "unit": "四级手术患者",
+    "unit": "四级手术患者住院人次",
     "required_measures": [
       "numerator",
       "denominator"
@@ -567,10 +1319,6 @@
       "surgery",
       "nursing"
     ],
-    "counting_unit": "四级手术患者住院人次",
-    "period_anchor": "admission",
-    "rule_conflict": "定义按患者统计，分子提示按每次手术判定；采用住院人次内全部四级手术均符合，需医院确认。",
-    "external_requirements": [],
     "fact_fields": {
       "admission": {
         "patient_id": "text",
@@ -605,7 +1353,102 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "四级手术患者住院人次",
+    "period_anchor": "admission",
+    "rule_conflict": "定义按患者统计，分子提示按每次手术判定；采用住院人次内全部四级手术均符合，需医院确认。",
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [
+            "手术记录",
+            "病案首页第二页",
+            "四级手术/介入记录"
+          ],
+          "page_categories": [
+            "surgery",
+            "cover"
+          ],
+          "event_types": [
+            "surgery"
+          ],
+          "target_fields": [
+            "event_time",
+            "procedure_name",
+            "procedure_code",
+            "grade"
+          ],
+          "aliases": [
+            "四级手术",
+            "四级",
+            "手术级别"
+          ]
+        },
+        {
+          "document_types": [
+            "交接记录单",
+            "床旁交接班记录"
+          ],
+          "page_categories": [
+            "nursing"
+          ],
+          "event_types": [
+            "nursing"
+          ],
+          "target_fields": [
+            "event_time",
+            "nursing_type"
+          ],
+          "aliases": [
+            "床旁交接班",
+            "交接班时间"
+          ]
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "surgery",
+          "nursing"
+        ],
+        "fields": [
+          "surgery.grade",
+          "surgery.event_time",
+          "nursing.event_time",
+          "nursing.nursing_type"
+        ],
+        "conditions": [
+          "手术分级为四级",
+          "交接班日期与手术日期相同"
+        ],
+        "counting_unit": "四级手术患者住院人次"
+      },
+      "denominator": {
+        "fields": [
+          "surgery.grade",
+          "surgery.event_time"
+        ],
+        "conditions": [
+          "存在四级手术或四级介入"
+        ],
+        "counting_unit": "四级手术患者住院人次"
+      },
+      "calculation_rules": {
+        "grade": 4,
+        "same_calendar_day": [
+          "surgery.event_time",
+          "nursing.event_time"
+        ],
+        "deduplicate_by": "surgery_id"
+      },
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": [
+        "定义按患者统计，提示示例按手术记录；当前按同次住院四级手术事件核对，待医院确认。"
+      ]
+    },
+    "external_requirements": []
   },
   {
     "id": "core_11",
@@ -623,7 +1466,7 @@
       "notes": "工作表1!G12",
       "hospital_notes": "工作表1!H12"
     },
-    "unit": "再次住院/手术对象",
+    "unit": "住院病例",
     "required_measures": [
       "numerator",
       "denominator"
@@ -644,10 +1487,6 @@
       "discussion",
       "progress"
     ],
-    "counting_unit": "住院病例",
-    "period_anchor": "admission",
-    "rule_conflict": null,
-    "external_requirements": [],
     "fact_fields": {
       "admission": {
         "patient_id": "text",
@@ -698,7 +1537,98 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "住院病例",
+    "period_anchor": "admission",
+    "rule_conflict": null,
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [
+            "再次入院记录",
+            "手术记录"
+          ],
+          "page_categories": [
+            "admission",
+            "surgery"
+          ],
+          "event_types": [
+            "readmission",
+            "surgery"
+          ],
+          "target_fields": [
+            "unplanned",
+            "reoperation",
+            "event_time"
+          ],
+          "aliases": [
+            "非计划再次住院",
+            "是否再次手术",
+            "非计划手术"
+          ]
+        },
+        {
+          "document_types": [
+            "病程记录",
+            "疑难病例讨论记录"
+          ],
+          "page_categories": [
+            "progress",
+            "discussion"
+          ],
+          "event_types": [
+            "discussion"
+          ],
+          "target_fields": [
+            "discussion_type",
+            "complete",
+            "conclusion"
+          ],
+          "aliases": [
+            "疑难病例讨论",
+            "讨论结论"
+          ]
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "readmission",
+          "surgery",
+          "discussion"
+        ],
+        "fields": [
+          "readmission.unplanned",
+          "surgery.reoperation",
+          "discussion.discussion_type",
+          "discussion.complete"
+        ],
+        "conditions": [
+          "非计划再次住院或非计划再次手术",
+          "存在正式疑难病例讨论"
+        ],
+        "counting_unit": "再次住院/手术对象"
+      },
+      "denominator": {
+        "fields": [
+          "readmission.unplanned",
+          "surgery.reoperation"
+        ],
+        "conditions": [
+          "只统计符合非计划条件的对象"
+        ],
+        "counting_unit": "再次住院/手术对象"
+      },
+      "calculation_rules": {
+        "discussion_type": "difficult",
+        "require_complete_document": true
+      },
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": []
   },
   {
     "id": "core_12",
@@ -716,7 +1646,7 @@
       "notes": "工作表1!G13",
       "hospital_notes": "工作表1!H13"
     },
-    "unit": "讨论对象",
+    "unit": "住院病例",
     "required_measures": [
       "numerator",
       "denominator"
@@ -737,10 +1667,6 @@
       "discussion",
       "progress"
     ],
-    "counting_unit": "住院病例",
-    "period_anchor": "admission",
-    "rule_conflict": "分子提示仅要求有讨论文书，定义还要求结论记入病历；采用结论完整性，需医院确认。",
-    "external_requirements": [],
     "fact_fields": {
       "admission": {
         "patient_id": "text",
@@ -791,7 +1717,94 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "住院病例",
+    "period_anchor": "admission",
+    "rule_conflict": "分子提示仅要求有讨论文书，定义还要求结论记入病历；采用结论完整性，需医院确认。",
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [
+            "再次入院记录",
+            "手术记录"
+          ],
+          "page_categories": [
+            "admission",
+            "surgery"
+          ],
+          "event_types": [
+            "readmission",
+            "surgery"
+          ],
+          "target_fields": [
+            "unplanned",
+            "reoperation",
+            "event_time"
+          ],
+          "aliases": [
+            "非计划再次住院",
+            "是否再次手术"
+          ]
+        },
+        {
+          "document_types": [
+            "病程记录",
+            "疑难病例讨论记录"
+          ],
+          "page_categories": [
+            "progress",
+            "discussion"
+          ],
+          "event_types": [
+            "discussion"
+          ],
+          "target_fields": [
+            "discussion_type",
+            "complete",
+            "conclusion"
+          ],
+          "aliases": [
+            "疑难病例讨论",
+            "讨论结论",
+            "记录结论"
+          ]
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "discussion"
+        ],
+        "fields": [
+          "discussion.discussion_type",
+          "discussion.complete",
+          "discussion.conclusion"
+        ],
+        "conditions": [
+          "对象符合非计划再次住院/手术",
+          "讨论结论已记入病历"
+        ],
+        "counting_unit": "讨论对象"
+      },
+      "denominator": {
+        "event_types": [
+          "discussion"
+        ],
+        "conditions": [
+          "对象已开展疑难病例讨论"
+        ],
+        "counting_unit": "讨论对象"
+      },
+      "calculation_rules": {
+        "discussion_type": "difficult",
+        "require_complete_and_conclusion": true
+      },
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": []
   },
   {
     "id": "core_13",
@@ -809,7 +1822,7 @@
       "notes": "工作表1!G14",
       "hospital_notes": "工作表1!H14"
     },
-    "unit": "异常费用患者",
+    "unit": "住院病例",
     "required_measures": [
       "numerator",
       "denominator"
@@ -827,10 +1840,6 @@
       "discussion",
       "discharge"
     ],
-    "counting_unit": "住院病例",
-    "period_anchor": "admission",
-    "rule_conflict": null,
-    "external_requirements": [],
     "fact_fields": {
       "admission": {
         "patient_id": "text",
@@ -860,7 +1869,94 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "住院病例",
+    "period_anchor": "admission",
+    "rule_conflict": null,
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [
+            "病案首页",
+            "费用信息"
+          ],
+          "page_categories": [
+            "cover",
+            "discharge"
+          ],
+          "event_types": [
+            "cost"
+          ],
+          "target_fields": [
+            "total"
+          ],
+          "aliases": [
+            "总费用",
+            "住院总费用",
+            "医疗总费用"
+          ]
+        },
+        {
+          "document_types": [
+            "病程记录",
+            "疑难病例讨论记录"
+          ],
+          "page_categories": [
+            "progress",
+            "discussion"
+          ],
+          "event_types": [
+            "discussion"
+          ],
+          "target_fields": [
+            "discussion_type",
+            "complete",
+            "conclusion"
+          ],
+          "aliases": [
+            "疑难病例讨论",
+            "讨论结论"
+          ]
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "cost",
+          "discussion"
+        ],
+        "fields": [
+          "cost.total",
+          "discussion.discussion_type"
+        ],
+        "conditions": [
+          "住院周期总费用达到20万元或医院配置阈值",
+          "存在疑难病例讨论"
+        ],
+        "counting_unit": "异常费用患者"
+      },
+      "denominator": {
+        "event_types": [
+          "cost"
+        ],
+        "fields": [
+          "cost.total"
+        ],
+        "conditions": [
+          "总费用达到阈值"
+        ],
+        "counting_unit": "异常费用患者"
+      },
+      "calculation_rules": {
+        "threshold_source": "config.high_cost_threshold",
+        "default_threshold": 200000
+      },
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": []
   },
   {
     "id": "core_14",
@@ -878,7 +1974,7 @@
       "notes": "工作表1!G15",
       "hospital_notes": "工作表1!H15"
     },
-    "unit": "抢救例次",
+    "unit": "抢救事件",
     "required_measures": [
       "numerator",
       "denominator"
@@ -897,10 +1993,6 @@
       "nursing",
       "discharge"
     ],
-    "counting_unit": "抢救事件",
-    "period_anchor": "rescue",
-    "rule_conflict": "抢救医嘱条数可能不同于实际抢救例次；采用实际抢救事件，需医院确认。",
-    "external_requirements": [],
     "fact_fields": {
       "rescue": {
         "rescue_id": "text",
@@ -918,7 +2010,97 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "抢救事件",
+    "period_anchor": "rescue",
+    "rule_conflict": "抢救医嘱条数可能不同于实际抢救例次；采用实际抢救事件，需医院确认。",
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [
+            "病程记录",
+            "抢救记录",
+            "临时医嘱"
+          ],
+          "page_categories": [
+            "progress",
+            "orders",
+            "nursing"
+          ],
+          "event_types": [
+            "rescue"
+          ],
+          "target_fields": [
+            "event_time",
+            "end_time",
+            "survival_confirmed_until"
+          ],
+          "aliases": [
+            "抢救记录",
+            "抢救开始时间",
+            "抢救结束时间",
+            "存活确认至"
+          ]
+        },
+        {
+          "document_types": [
+            "死亡记录",
+            "出院记录"
+          ],
+          "page_categories": [
+            "death",
+            "discharge"
+          ],
+          "event_types": [
+            "death",
+            "discharge"
+          ],
+          "target_fields": [
+            "event_time"
+          ],
+          "aliases": [
+            "死亡时间",
+            "出院时间"
+          ]
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "rescue"
+        ],
+        "fields": [
+          "rescue.event_time",
+          "rescue.end_time",
+          "rescue.survival_confirmed_until"
+        ],
+        "conditions": [
+          "逐次统计抢救事件",
+          "结束后存活超过24小时或至下一次抢救开始"
+        ],
+        "counting_unit": "抢救事件"
+      },
+      "denominator": {
+        "event_types": [
+          "rescue"
+        ],
+        "conditions": [
+          "每个实际抢救事件计1次"
+        ],
+        "counting_unit": "抢救事件"
+      },
+      "calculation_rules": {
+        "success_window_hours": 24,
+        "deduplicate_by": "rescue_id"
+      },
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": [
+        "抢救医嘱条数与实际抢救事件可能不同；当前按实际抢救事件计数，待医院确认。"
+      ]
+    },
+    "external_requirements": []
   },
   {
     "id": "core_15",
@@ -936,7 +2118,7 @@
       "notes": "工作表1!G16",
       "hospital_notes": "工作表1!H16"
     },
-    "unit": "手术例次",
+    "unit": "手术事件",
     "required_measures": [
       "numerator",
       "denominator"
@@ -956,10 +2138,6 @@
       "orders",
       "consent"
     ],
-    "counting_unit": "手术事件",
-    "period_anchor": "surgery",
-    "rule_conflict": null,
-    "external_requirements": [],
     "fact_fields": {
       "surgery": {
         "surgery_id": "text",
@@ -1004,6 +2182,7 @@
         "content": "text",
         "stop_time": "time",
         "drug_name": "text",
+        "nursing_level": "text",
         "is_medication": "bool",
         "event_date": "date",
         "record_date": "date",
@@ -1016,7 +2195,119 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "手术事件",
+    "period_anchor": "surgery",
+    "rule_conflict": null,
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [
+            "病程记录",
+            "术前讨论记录"
+          ],
+          "page_categories": [
+            "progress",
+            "discussion"
+          ],
+          "event_types": [
+            "discussion"
+          ],
+          "target_fields": [
+            "discussion_type",
+            "complete",
+            "completion_time"
+          ],
+          "aliases": [
+            "术前讨论",
+            "讨论完成时间"
+          ]
+        },
+        {
+          "document_types": [
+            "手术记录",
+            "介入治疗记录",
+            "内镜下治疗记录"
+          ],
+          "page_categories": [
+            "surgery"
+          ],
+          "event_types": [
+            "surgery"
+          ],
+          "target_fields": [
+            "event_time",
+            "procedure_name",
+            "emergency_lifesaving"
+          ],
+          "aliases": [
+            "手术记录",
+            "介入治疗",
+            "内镜下治疗"
+          ]
+        },
+        {
+          "document_types": [
+            "手术医嘱",
+            "手术知情同意书"
+          ],
+          "page_categories": [
+            "orders",
+            "consent"
+          ],
+          "event_types": [
+            "order",
+            "consent"
+          ],
+          "target_fields": [
+            "event_time",
+            "patient_signed_time"
+          ],
+          "aliases": [
+            "手术医嘱",
+            "手术同意书"
+          ]
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "surgery",
+          "discussion"
+        ],
+        "fields": [
+          "surgery.event_time",
+          "discussion.completion_time",
+          "discussion.complete"
+        ],
+        "conditions": [
+          "一台手术对应一次术前讨论",
+          "除抢救生命急诊手术外，讨论完成早于手术医嘱和知情同意签署"
+        ],
+        "counting_unit": "手术事件"
+      },
+      "denominator": {
+        "event_types": [
+          "surgery"
+        ],
+        "conditions": [
+          "存在实际手术/介入/内镜治疗"
+        ],
+        "counting_unit": "手术事件"
+      },
+      "calculation_rules": {
+        "emergency_exception": "surgery.emergency_lifesaving",
+        "require_before": [
+          "order.event_time",
+          "consent.patient_signed_time"
+        ]
+      },
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": []
   },
   {
     "id": "core_16",
@@ -1034,7 +2325,7 @@
       "notes": "工作表1!G17",
       "hospital_notes": "工作表1!H17"
     },
-    "unit": "已讨论手术例次",
+    "unit": "已完成术前讨论的手术事件",
     "required_measures": [
       "numerator",
       "denominator"
@@ -1054,10 +2345,6 @@
       "orders",
       "consent"
     ],
-    "counting_unit": "已完成术前讨论的手术事件",
-    "period_anchor": "surgery",
-    "rule_conflict": null,
-    "external_requirements": [],
     "fact_fields": {
       "surgery": {
         "surgery_id": "text",
@@ -1102,6 +2389,7 @@
         "content": "text",
         "stop_time": "time",
         "drug_name": "text",
+        "nursing_level": "text",
         "is_medication": "bool",
         "event_date": "date",
         "record_date": "date",
@@ -1114,7 +2402,95 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "已完成术前讨论的手术事件",
+    "period_anchor": "surgery",
+    "rule_conflict": null,
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [
+            "病程记录",
+            "术前讨论记录"
+          ],
+          "page_categories": [
+            "progress",
+            "discussion"
+          ],
+          "event_types": [
+            "discussion"
+          ],
+          "target_fields": [
+            "discussion_type",
+            "participants",
+            "planned_surgeon"
+          ],
+          "aliases": [
+            "术前讨论",
+            "参加人员",
+            "手术医师",
+            "计划术者"
+          ]
+        },
+        {
+          "document_types": [
+            "手术记录"
+          ],
+          "page_categories": [
+            "surgery"
+          ],
+          "event_types": [
+            "surgery"
+          ],
+          "target_fields": [
+            "surgeon",
+            "surgeon_id",
+            "event_time"
+          ],
+          "aliases": [
+            "手术记录",
+            "手术指导者",
+            "术者",
+            "主刀医师"
+          ]
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "surgery",
+          "discussion"
+        ],
+        "fields": [
+          "surgery.surgeon",
+          "surgery.surgeon_id",
+          "discussion.participants",
+          "discussion.planned_surgeon"
+        ],
+        "conditions": [
+          "术前讨论参与人员包含手术指导者或手术者"
+        ],
+        "counting_unit": "手术事件"
+      },
+      "denominator": {
+        "event_types": [
+          "surgery"
+        ],
+        "conditions": [
+          "存在已开展且有术前讨论的手术"
+        ],
+        "counting_unit": "手术事件"
+      },
+      "calculation_rules": {
+        "relation": "discussion_for_surgery",
+        "match": "surgeon_in_participants"
+      },
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": []
   },
   {
     "id": "core_17",
@@ -1132,7 +2508,7 @@
       "notes": "工作表1!G18",
       "hospital_notes": "工作表1!H18"
     },
-    "unit": "手术例次",
+    "unit": "手术事件",
     "required_measures": [
       "numerator",
       "denominator"
@@ -1148,10 +2524,6 @@
       "surgery",
       "discussion"
     ],
-    "counting_unit": "手术事件",
-    "period_anchor": "surgery",
-    "rule_conflict": null,
-    "external_requirements": [],
     "fact_fields": {
       "surgery": {
         "surgery_id": "text",
@@ -1189,7 +2561,93 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "手术事件",
+    "period_anchor": "surgery",
+    "rule_conflict": null,
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [
+            "病程记录",
+            "术前讨论记录"
+          ],
+          "page_categories": [
+            "progress",
+            "discussion"
+          ],
+          "event_types": [
+            "discussion"
+          ],
+          "target_fields": [
+            "discussion_type",
+            "planned_procedure"
+          ],
+          "aliases": [
+            "术前讨论",
+            "拟手术名称",
+            "计划手术名称",
+            "术式"
+          ]
+        },
+        {
+          "document_types": [
+            "手术记录"
+          ],
+          "page_categories": [
+            "surgery"
+          ],
+          "event_types": [
+            "surgery"
+          ],
+          "target_fields": [
+            "procedure_name",
+            "procedure_code",
+            "event_time"
+          ],
+          "aliases": [
+            "手术记录",
+            "手术名称",
+            "实际手术名称",
+            "术式"
+          ]
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "surgery",
+          "discussion"
+        ],
+        "fields": [
+          "discussion.planned_procedure",
+          "surgery.procedure_name",
+          "surgery.procedure_code"
+        ],
+        "conditions": [
+          "计划手术名称/术式与实际实施名称/术式一致"
+        ],
+        "counting_unit": "手术事件"
+      },
+      "denominator": {
+        "event_types": [
+          "surgery"
+        ],
+        "conditions": [
+          "存在实际手术"
+        ],
+        "counting_unit": "手术事件"
+      },
+      "calculation_rules": {
+        "relation": "discussion_for_surgery",
+        "match": "normalized_procedure_name_or_code"
+      },
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": []
   },
   {
     "id": "core_18",
@@ -1207,7 +2665,7 @@
       "notes": "工作表1!G19",
       "hospital_notes": "工作表1!H19"
     },
-    "unit": "手术例次",
+    "unit": "手术事件",
     "required_measures": [
       "numerator",
       "denominator"
@@ -1223,10 +2681,6 @@
       "surgery",
       "discussion"
     ],
-    "counting_unit": "手术事件",
-    "period_anchor": "surgery",
-    "rule_conflict": "分子提示复制了术者参与讨论的条件；采用计划与实际术者一致，需医院确认。",
-    "external_requirements": [],
     "fact_fields": {
       "surgery": {
         "surgery_id": "text",
@@ -1264,7 +2718,97 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "手术事件",
+    "period_anchor": "surgery",
+    "rule_conflict": "分子提示复制了术者参与讨论的条件；采用计划与实际术者一致，需医院确认。",
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [
+            "病程记录",
+            "术前讨论记录"
+          ],
+          "page_categories": [
+            "progress",
+            "discussion"
+          ],
+          "event_types": [
+            "discussion"
+          ],
+          "target_fields": [
+            "discussion_type",
+            "planned_surgeon",
+            "participants"
+          ],
+          "aliases": [
+            "术前讨论",
+            "手术医师",
+            "计划术者",
+            "参加人员"
+          ]
+        },
+        {
+          "document_types": [
+            "手术记录"
+          ],
+          "page_categories": [
+            "surgery"
+          ],
+          "event_types": [
+            "surgery"
+          ],
+          "target_fields": [
+            "surgeon",
+            "surgeon_id",
+            "event_time"
+          ],
+          "aliases": [
+            "手术记录",
+            "手术指导者",
+            "术者",
+            "主刀医师"
+          ]
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "surgery",
+          "discussion"
+        ],
+        "fields": [
+          "discussion.planned_surgeon",
+          "discussion.participants",
+          "surgery.surgeon",
+          "surgery.surgeon_id"
+        ],
+        "conditions": [
+          "按医院确认的指标口径比较计划术者与实际术者"
+        ],
+        "counting_unit": "手术事件"
+      },
+      "denominator": {
+        "event_types": [
+          "surgery"
+        ],
+        "conditions": [
+          "存在实际手术"
+        ],
+        "counting_unit": "手术事件"
+      },
+      "calculation_rules": {
+        "relation": "discussion_for_surgery",
+        "match": "planned_surgeon_equals_actual_surgeon"
+      },
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": [
+        "文档截图将本项也写成手术医师参与讨论，现有指标定义按计划术者与实际术者一致执行，待医院确认。"
+      ]
+    },
+    "external_requirements": []
   },
   {
     "id": "core_19",
@@ -1300,12 +2844,6 @@
       "discussion",
       "discharge"
     ],
-    "counting_unit": "死亡病例",
-    "period_anchor": "death",
-    "rule_conflict": null,
-    "external_requirements": [
-      "医院工作日历"
-    ],
     "fact_fields": {
       "death": {
         "event_date": "date",
@@ -1327,7 +2865,87 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "死亡病例",
+    "period_anchor": "death",
+    "rule_conflict": null,
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [],
+          "page_categories": [
+            "orders",
+            "progress",
+            "discussion",
+            "discharge"
+          ],
+          "event_types": [
+            "death"
+          ],
+          "target_fields": [
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        },
+        {
+          "document_types": [],
+          "page_categories": [
+            "orders",
+            "progress",
+            "discussion",
+            "discharge"
+          ],
+          "event_types": [
+            "discussion"
+          ],
+          "target_fields": [
+            "discussion_type",
+            "participants",
+            "departments",
+            "host",
+            "host_role",
+            "department",
+            "organizer",
+            "conclusion",
+            "complete",
+            "completion_time",
+            "planned_procedure",
+            "planned_surgeon",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "death",
+          "discussion"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "死亡病例"
+      },
+      "denominator": {
+        "event_types": [
+          "death",
+          "discussion"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "死亡病例"
+      },
+      "calculation_rules": {},
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": [
+      "医院工作日历"
+    ]
   },
   {
     "id": "core_20",
@@ -1345,7 +2963,7 @@
       "notes": "工作表1!G21",
       "hospital_notes": "工作表1!H21"
     },
-    "unit": "死亡病例（不同集合）",
+    "unit": "两个死亡病例集合",
     "required_measures": [
       "numerator",
       "denominator"
@@ -1362,12 +2980,6 @@
       "discussion",
       "discharge",
       "progress"
-    ],
-    "counting_unit": "两个死亡病例集合",
-    "period_anchor": "death",
-    "rule_conflict": "提示把死亡病例当分母、参与当组织；采用纠纷死亡病例和组织主体，需医院确认。",
-    "external_requirements": [
-      "纠纷死亡病例资料"
     ],
     "fact_fields": {
       "death": {
@@ -1395,7 +3007,104 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "两个死亡病例集合",
+    "period_anchor": "death",
+    "rule_conflict": "提示把死亡病例当分母、参与当组织；采用纠纷死亡病例和组织主体，需医院确认。",
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [],
+          "page_categories": [
+            "discussion",
+            "discharge",
+            "progress"
+          ],
+          "event_types": [
+            "death"
+          ],
+          "target_fields": [
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        },
+        {
+          "document_types": [],
+          "page_categories": [
+            "discussion",
+            "discharge",
+            "progress"
+          ],
+          "event_types": [
+            "discussion"
+          ],
+          "target_fields": [
+            "discussion_type",
+            "participants",
+            "departments",
+            "host",
+            "host_role",
+            "department",
+            "organizer",
+            "conclusion",
+            "complete",
+            "completion_time",
+            "planned_procedure",
+            "planned_surgeon",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        },
+        {
+          "document_types": [],
+          "page_categories": [
+            "discussion",
+            "discharge",
+            "progress"
+          ],
+          "event_types": [
+            "dispute"
+          ],
+          "target_fields": [
+            "death_related",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "death",
+          "discussion",
+          "dispute"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "两个死亡病例集合"
+      },
+      "denominator": {
+        "event_types": [
+          "death",
+          "discussion",
+          "dispute"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "两个死亡病例集合"
+      },
+      "calculation_rules": {},
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": [
+      "纠纷死亡病例资料"
+    ]
   },
   {
     "id": "core_21",
@@ -1430,12 +3139,6 @@
       "progress",
       "discharge"
     ],
-    "counting_unit": "死亡病例",
-    "period_anchor": "death",
-    "rule_conflict": null,
-    "external_requirements": [
-      "科主任身份映射"
-    ],
     "fact_fields": {
       "death": {
         "event_date": "date",
@@ -1457,7 +3160,85 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "死亡病例",
+    "period_anchor": "death",
+    "rule_conflict": null,
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [],
+          "page_categories": [
+            "discussion",
+            "progress",
+            "discharge"
+          ],
+          "event_types": [
+            "death"
+          ],
+          "target_fields": [
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        },
+        {
+          "document_types": [],
+          "page_categories": [
+            "discussion",
+            "progress",
+            "discharge"
+          ],
+          "event_types": [
+            "discussion"
+          ],
+          "target_fields": [
+            "discussion_type",
+            "participants",
+            "departments",
+            "host",
+            "host_role",
+            "department",
+            "organizer",
+            "conclusion",
+            "complete",
+            "completion_time",
+            "planned_procedure",
+            "planned_surgeon",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "death",
+          "discussion"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "死亡病例"
+      },
+      "denominator": {
+        "event_types": [
+          "death",
+          "discussion"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "死亡病例"
+      },
+      "calculation_rules": {},
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": [
+      "科主任身份映射"
+    ]
   },
   {
     "id": "core_22",
@@ -1492,12 +3273,6 @@
       "progress",
       "orders"
     ],
-    "counting_unit": "应上传死亡病案",
-    "period_anchor": "death",
-    "rule_conflict": "分子分母提示都只判断死亡；采用应上传名单和完整上传结果，需医院确认。",
-    "external_requirements": [
-      "应上传名单及完整上传结果"
-    ],
     "fact_fields": {
       "death": {
         "event_date": "date",
@@ -1509,7 +3284,75 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "应上传死亡病案",
+    "period_anchor": "death",
+    "rule_conflict": "分子分母提示都只判断死亡；采用应上传名单和完整上传结果，需医院确认。",
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [],
+          "page_categories": [
+            "discharge",
+            "progress",
+            "orders"
+          ],
+          "event_types": [
+            "death"
+          ],
+          "target_fields": [
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        },
+        {
+          "document_types": [],
+          "page_categories": [
+            "discharge",
+            "progress",
+            "orders"
+          ],
+          "event_types": [
+            "upload"
+          ],
+          "target_fields": [
+            "required",
+            "complete",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "death",
+          "upload"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "应上传死亡病案"
+      },
+      "denominator": {
+        "event_types": [
+          "death",
+          "upload"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "应上传死亡病案"
+      },
+      "calculation_rules": {},
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": [
+      "应上传名单及完整上传结果"
+    ]
   },
   {
     "id": "core_23",
@@ -1541,10 +3384,6 @@
     "page_categories": [
       "orders"
     ],
-    "counting_unit": "长期医嘱条目",
-    "period_anchor": "order",
-    "rule_conflict": null,
-    "external_requirements": [],
     "fact_fields": {
       "order": {
         "order_id": "text",
@@ -1553,12 +3392,66 @@
         "content": "text",
         "stop_time": "time",
         "drug_name": "text",
+        "nursing_level": "text",
         "is_medication": "bool",
         "event_date": "date",
         "record_date": "date",
         "stop_date": "date"
       }
-    }
+    },
+    "counting_unit": "长期医嘱条目",
+    "period_anchor": "order",
+    "rule_conflict": null,
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [],
+          "page_categories": [
+            "orders"
+          ],
+          "event_types": [
+            "order"
+          ],
+          "target_fields": [
+            "order_id",
+            "order_category",
+            "order_type",
+            "content",
+            "stop_time",
+            "drug_name",
+            "nursing_level",
+            "is_medication",
+            "event_date",
+            "record_date",
+            "stop_date"
+          ],
+          "aliases": []
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "order"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "长期医嘱条目"
+      },
+      "denominator": {
+        "event_types": [
+          "order"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "长期医嘱条目"
+      },
+      "calculation_rules": {},
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": []
   },
   {
     "id": "core_24",
@@ -1576,7 +3469,7 @@
       "notes": "工作表1!G25",
       "hospital_notes": "工作表1!H25"
     },
-    "unit": "手术例次",
+    "unit": "手术事件",
     "required_measures": [
       "numerator",
       "denominator"
@@ -1590,10 +3483,6 @@
     "page_categories": [
       "surgery"
     ],
-    "counting_unit": "手术事件",
-    "period_anchor": "surgery",
-    "rule_conflict": "分子提示固定0；改为跨病例医师时间重合检测，需医院确认。",
-    "external_requirements": [],
     "fact_fields": {
       "surgery": {
         "surgery_id": "text",
@@ -1615,7 +3504,67 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "手术事件",
+    "period_anchor": "surgery",
+    "rule_conflict": "分子提示固定0；改为跨病例医师时间重合检测，需医院确认。",
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [],
+          "page_categories": [
+            "surgery"
+          ],
+          "event_types": [
+            "surgery"
+          ],
+          "target_fields": [
+            "surgery_id",
+            "procedure_name",
+            "procedure_code",
+            "grade",
+            "end_time",
+            "surgeon",
+            "surgeon_id",
+            "planned_surgeon",
+            "planned_surgeon_id",
+            "planned_procedure",
+            "procedure_consistent",
+            "unplanned",
+            "reoperation",
+            "emergency_lifesaving",
+            "intraoperative_transfusion",
+            "autotransfusion",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "surgery"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "手术事件"
+      },
+      "denominator": {
+        "event_types": [
+          "surgery"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "手术事件"
+      },
+      "calculation_rules": {},
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": []
   },
   {
     "id": "core_25",
@@ -1633,7 +3582,7 @@
       "notes": "工作表1!G26",
       "hospital_notes": "工作表1!H26"
     },
-    "unit": "手术例次",
+    "unit": "手术事件",
     "required_measures": [
       "numerator",
       "denominator"
@@ -1649,10 +3598,6 @@
       "surgery",
       "anesthesia"
     ],
-    "counting_unit": "手术事件",
-    "period_anchor": "surgery",
-    "rule_conflict": "分子提示固定0；改为跨病例麻醉时间重合检测，需医院确认。",
-    "external_requirements": [],
     "fact_fields": {
       "surgery": {
         "surgery_id": "text",
@@ -1682,7 +3627,89 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "手术事件",
+    "period_anchor": "surgery",
+    "rule_conflict": "分子提示固定0；改为跨病例麻醉时间重合检测，需医院确认。",
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [],
+          "page_categories": [
+            "surgery",
+            "anesthesia"
+          ],
+          "event_types": [
+            "surgery"
+          ],
+          "target_fields": [
+            "surgery_id",
+            "procedure_name",
+            "procedure_code",
+            "grade",
+            "end_time",
+            "surgeon",
+            "surgeon_id",
+            "planned_surgeon",
+            "planned_surgeon_id",
+            "planned_procedure",
+            "procedure_consistent",
+            "unplanned",
+            "reoperation",
+            "emergency_lifesaving",
+            "intraoperative_transfusion",
+            "autotransfusion",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        },
+        {
+          "document_types": [],
+          "page_categories": [
+            "surgery",
+            "anesthesia"
+          ],
+          "event_types": [
+            "anesthesia"
+          ],
+          "target_fields": [
+            "anesthesia_id",
+            "end_time",
+            "physician",
+            "physician_id",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "surgery",
+          "anesthesia"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "手术事件"
+      },
+      "denominator": {
+        "event_types": [
+          "surgery",
+          "anesthesia"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "手术事件"
+      },
+      "calculation_rules": {},
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": []
   },
   {
     "id": "core_26",
@@ -1700,7 +3727,7 @@
       "notes": "工作表1!G27",
       "hospital_notes": "工作表1!H27"
     },
-    "unit": "发生率之比",
+    "unit": "手术事件",
     "required_measures": [
       "four_success",
       "four_total",
@@ -1719,12 +3746,6 @@
       "surgery",
       "progress",
       "discharge"
-    ],
-    "counting_unit": "手术事件",
-    "period_anchor": "surgery",
-    "rule_conflict": "提示仅给两个并发症计数；需要三级和四级各自分子、分母，需医院确认。",
-    "external_requirements": [
-      "医院手术分级目录"
     ],
     "fact_fields": {
       "surgery": {
@@ -1753,7 +3774,93 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "手术事件",
+    "period_anchor": "surgery",
+    "rule_conflict": "提示仅给两个并发症计数；需要三级和四级各自分子、分母，需医院确认。",
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [],
+          "page_categories": [
+            "cover",
+            "surgery",
+            "progress",
+            "discharge"
+          ],
+          "event_types": [
+            "surgery"
+          ],
+          "target_fields": [
+            "surgery_id",
+            "procedure_name",
+            "procedure_code",
+            "grade",
+            "end_time",
+            "surgeon",
+            "surgeon_id",
+            "planned_surgeon",
+            "planned_surgeon_id",
+            "planned_procedure",
+            "procedure_consistent",
+            "unplanned",
+            "reoperation",
+            "emergency_lifesaving",
+            "intraoperative_transfusion",
+            "autotransfusion",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        },
+        {
+          "document_types": [],
+          "page_categories": [
+            "cover",
+            "surgery",
+            "progress",
+            "discharge"
+          ],
+          "event_types": [
+            "complication"
+          ],
+          "target_fields": [
+            "diagnosis",
+            "surgery_related",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "surgery",
+          "complication"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "手术事件"
+      },
+      "denominator": {
+        "event_types": [
+          "surgery",
+          "complication"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "手术事件"
+      },
+      "calculation_rules": {},
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": [
+      "医院手术分级目录"
+    ]
   },
   {
     "id": "core_27",
@@ -1771,7 +3878,7 @@
       "notes": "工作表1!G28",
       "hospital_notes": "工作表1!H28"
     },
-    "unit": "患者死亡率之比",
+    "unit": "各级手术患者住院人次",
     "required_measures": [
       "four_success",
       "four_total",
@@ -1791,12 +3898,6 @@
       "surgery",
       "discharge",
       "progress"
-    ],
-    "counting_unit": "各级手术患者住院人次",
-    "period_anchor": "admission",
-    "rule_conflict": "提示仅给两个死亡计数；需要三级和四级各自患者总数；同次住院按最高手术级别归组，需医院确认。",
-    "external_requirements": [
-      "医院手术分级目录"
     ],
     "fact_fields": {
       "admission": {
@@ -1830,7 +3931,113 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "各级手术患者住院人次",
+    "period_anchor": "admission",
+    "rule_conflict": "提示仅给两个死亡计数；需要三级和四级各自患者总数；同次住院按最高手术级别归组，需医院确认。",
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [],
+          "page_categories": [
+            "cover",
+            "surgery",
+            "discharge",
+            "progress"
+          ],
+          "event_types": [
+            "admission"
+          ],
+          "target_fields": [
+            "patient_id",
+            "episode_id",
+            "department",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        },
+        {
+          "document_types": [],
+          "page_categories": [
+            "cover",
+            "surgery",
+            "discharge",
+            "progress"
+          ],
+          "event_types": [
+            "surgery"
+          ],
+          "target_fields": [
+            "surgery_id",
+            "procedure_name",
+            "procedure_code",
+            "grade",
+            "end_time",
+            "surgeon",
+            "surgeon_id",
+            "planned_surgeon",
+            "planned_surgeon_id",
+            "planned_procedure",
+            "procedure_consistent",
+            "unplanned",
+            "reoperation",
+            "emergency_lifesaving",
+            "intraoperative_transfusion",
+            "autotransfusion",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        },
+        {
+          "document_types": [],
+          "page_categories": [
+            "cover",
+            "surgery",
+            "discharge",
+            "progress"
+          ],
+          "event_types": [
+            "death"
+          ],
+          "target_fields": [
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "admission",
+          "surgery",
+          "death"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "各级手术患者住院人次"
+      },
+      "denominator": {
+        "event_types": [
+          "admission",
+          "surgery",
+          "death"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "各级手术患者住院人次"
+      },
+      "calculation_rules": {},
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": [
+      "医院手术分级目录"
+    ]
   },
   {
     "id": "core_28",
@@ -1848,7 +4055,7 @@
       "notes": "工作表1!G29",
       "hospital_notes": "工作表1!H29"
     },
-    "unit": "四级手术例次",
+    "unit": "四级手术事件",
     "required_measures": [
       "numerator",
       "denominator"
@@ -1864,12 +4071,6 @@
       "cover",
       "surgery",
       "discussion"
-    ],
-    "counting_unit": "四级手术事件",
-    "period_anchor": "surgery",
-    "rule_conflict": "分母提示误写三级手术；采用四级手术，需医院确认。",
-    "external_requirements": [
-      "医院手术分级目录"
     ],
     "fact_fields": {
       "surgery": {
@@ -1908,7 +4109,101 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "四级手术事件",
+    "period_anchor": "surgery",
+    "rule_conflict": "分母提示误写三级手术；采用四级手术，需医院确认。",
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [],
+          "page_categories": [
+            "cover",
+            "surgery",
+            "discussion"
+          ],
+          "event_types": [
+            "surgery"
+          ],
+          "target_fields": [
+            "surgery_id",
+            "procedure_name",
+            "procedure_code",
+            "grade",
+            "end_time",
+            "surgeon",
+            "surgeon_id",
+            "planned_surgeon",
+            "planned_surgeon_id",
+            "planned_procedure",
+            "procedure_consistent",
+            "unplanned",
+            "reoperation",
+            "emergency_lifesaving",
+            "intraoperative_transfusion",
+            "autotransfusion",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        },
+        {
+          "document_types": [],
+          "page_categories": [
+            "cover",
+            "surgery",
+            "discussion"
+          ],
+          "event_types": [
+            "discussion"
+          ],
+          "target_fields": [
+            "discussion_type",
+            "participants",
+            "departments",
+            "host",
+            "host_role",
+            "department",
+            "organizer",
+            "conclusion",
+            "complete",
+            "completion_time",
+            "planned_procedure",
+            "planned_surgeon",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "surgery",
+          "discussion"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "四级手术事件"
+      },
+      "denominator": {
+        "event_types": [
+          "surgery",
+          "discussion"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "四级手术事件"
+      },
+      "calculation_rules": {},
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": [
+      "医院手术分级目录"
+    ]
   },
   {
     "id": "core_29",
@@ -1941,12 +4236,6 @@
       "cover",
       "surgery"
     ],
-    "counting_unit": "术种",
-    "period_anchor": "surgery",
-    "rule_conflict": null,
-    "external_requirements": [
-      "医院手术备案目录"
-    ],
     "fact_fields": {
       "surgery": {
         "surgery_id": "text",
@@ -1968,7 +4257,70 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "术种",
+    "period_anchor": "surgery",
+    "rule_conflict": null,
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [],
+          "page_categories": [
+            "cover",
+            "surgery"
+          ],
+          "event_types": [
+            "surgery"
+          ],
+          "target_fields": [
+            "surgery_id",
+            "procedure_name",
+            "procedure_code",
+            "grade",
+            "end_time",
+            "surgeon",
+            "surgeon_id",
+            "planned_surgeon",
+            "planned_surgeon_id",
+            "planned_procedure",
+            "procedure_consistent",
+            "unplanned",
+            "reoperation",
+            "emergency_lifesaving",
+            "intraoperative_transfusion",
+            "autotransfusion",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "surgery"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "术种"
+      },
+      "denominator": {
+        "event_types": [
+          "surgery"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "术种"
+      },
+      "calculation_rules": {},
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": [
+      "医院手术备案目录"
+    ]
   },
   {
     "id": "core_30",
@@ -2005,12 +4357,6 @@
       "surgery",
       "progress"
     ],
-    "counting_unit": "项目种类",
-    "period_anchor": "external",
-    "rule_conflict": null,
-    "external_requirements": [
-      "四年新技术新项目台账"
-    ],
     "fact_fields": {
       "surgery": {
         "surgery_id": "text",
@@ -2032,7 +4378,70 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "项目种类",
+    "period_anchor": "external",
+    "rule_conflict": null,
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [],
+          "page_categories": [
+            "surgery",
+            "progress"
+          ],
+          "event_types": [
+            "surgery"
+          ],
+          "target_fields": [
+            "surgery_id",
+            "procedure_name",
+            "procedure_code",
+            "grade",
+            "end_time",
+            "surgeon",
+            "surgeon_id",
+            "planned_surgeon",
+            "planned_surgeon_id",
+            "planned_procedure",
+            "procedure_consistent",
+            "unplanned",
+            "reoperation",
+            "emergency_lifesaving",
+            "intraoperative_transfusion",
+            "autotransfusion",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "surgery"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "项目种类"
+      },
+      "denominator": {
+        "event_types": [
+          "surgery"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "项目种类"
+      },
+      "calculation_rules": {},
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": [
+      "四年新技术新项目台账"
+    ]
   },
   {
     "id": "core_31",
@@ -2050,7 +4459,7 @@
       "notes": "工作表1!G32",
       "hospital_notes": "工作表1!H32"
     },
-    "unit": "分钟",
+    "unit": "危急值条目时长",
     "required_measures": [
       "minutes",
       "eligible_total"
@@ -2067,12 +4476,6 @@
       "progress",
       "nursing"
     ],
-    "counting_unit": "危急值条目时长",
-    "period_anchor": "critical_value",
-    "rule_conflict": null,
-    "external_requirements": [
-      "危急值出现和接收时间（PDF无记录时需导出）"
-    ],
     "fact_fields": {
       "critical_value": {
         "critical_id": "text",
@@ -2083,7 +4486,61 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "危急值条目时长",
+    "period_anchor": "critical_value",
+    "rule_conflict": null,
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [],
+          "page_categories": [
+            "lab",
+            "imaging",
+            "progress",
+            "nursing"
+          ],
+          "event_types": [
+            "critical_value"
+          ],
+          "target_fields": [
+            "critical_id",
+            "item",
+            "report_time",
+            "received_time",
+            "department",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "critical_value"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "危急值条目时长"
+      },
+      "denominator": {
+        "event_types": [
+          "critical_value"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "危急值条目时长"
+      },
+      "calculation_rules": {},
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": [
+      "危急值出现和接收时间（PDF无记录时需导出）"
+    ]
   },
   {
     "id": "core_32",
@@ -2122,12 +4579,6 @@
       "orders",
       "nursing"
     ],
-    "counting_unit": "危急值条目",
-    "period_anchor": "critical_value",
-    "rule_conflict": "提示要求相关医嘱，备注要求当日病程记录；同时要求关联处置医嘱和病程证据，需医院确认。",
-    "external_requirements": [
-      "完整危急值明细（PDF无记录时需导出）"
-    ],
     "fact_fields": {
       "critical_value": {
         "critical_id": "text",
@@ -2145,6 +4596,7 @@
         "content": "text",
         "stop_time": "time",
         "drug_name": "text",
+        "nursing_level": "text",
         "is_medication": "bool",
         "event_date": "date",
         "record_date": "date",
@@ -2166,7 +4618,139 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "危急值条目",
+    "period_anchor": "critical_value",
+    "rule_conflict": "提示要求相关医嘱，备注要求当日病程记录；同时要求关联处置医嘱和病程证据，需医院确认。",
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [],
+          "page_categories": [
+            "lab",
+            "imaging",
+            "progress",
+            "orders",
+            "nursing"
+          ],
+          "event_types": [
+            "critical_value"
+          ],
+          "target_fields": [
+            "critical_id",
+            "item",
+            "report_time",
+            "received_time",
+            "department",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        },
+        {
+          "document_types": [],
+          "page_categories": [
+            "lab",
+            "imaging",
+            "progress",
+            "orders",
+            "nursing"
+          ],
+          "event_types": [
+            "order"
+          ],
+          "target_fields": [
+            "order_id",
+            "order_category",
+            "order_type",
+            "content",
+            "stop_time",
+            "drug_name",
+            "nursing_level",
+            "is_medication",
+            "event_date",
+            "record_date",
+            "stop_date"
+          ],
+          "aliases": []
+        },
+        {
+          "document_types": [],
+          "page_categories": [
+            "lab",
+            "imaging",
+            "progress",
+            "orders",
+            "nursing"
+          ],
+          "event_types": [
+            "ward_round"
+          ],
+          "target_fields": [
+            "physician",
+            "physician_role",
+            "analysis",
+            "plan",
+            "severity",
+            "norm_compliant",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        },
+        {
+          "document_types": [],
+          "page_categories": [
+            "lab",
+            "imaging",
+            "progress",
+            "orders",
+            "nursing"
+          ],
+          "event_types": [
+            "progress_note"
+          ],
+          "target_fields": [
+            "analysis",
+            "plan",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "critical_value",
+          "order",
+          "ward_round",
+          "progress_note"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "危急值条目"
+      },
+      "denominator": {
+        "event_types": [
+          "critical_value",
+          "order",
+          "ward_round",
+          "progress_note"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "危急值条目"
+      },
+      "calculation_rules": {},
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": [
+      "完整危急值明细（PDF无记录时需导出）"
+    ]
   },
   {
     "id": "core_33",
@@ -2184,7 +4768,7 @@
       "notes": "工作表1!G34",
       "hospital_notes": "工作表1!H34"
     },
-    "unit": "特殊级抗菌药物医嘱",
+    "unit": "特殊级抗菌药物医嘱条目",
     "required_measures": [
       "numerator",
       "denominator"
@@ -2201,12 +4785,6 @@
       "consultation",
       "progress"
     ],
-    "counting_unit": "特殊级抗菌药物医嘱条目",
-    "period_anchor": "order",
-    "rule_conflict": null,
-    "external_requirements": [
-      "医院特殊使用级抗菌药物名单"
-    ],
     "fact_fields": {
       "order": {
         "order_id": "text",
@@ -2215,6 +4793,7 @@
         "content": "text",
         "stop_time": "time",
         "drug_name": "text",
+        "nursing_level": "text",
         "is_medication": "bool",
         "event_date": "date",
         "record_date": "date",
@@ -2229,7 +4808,87 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "特殊级抗菌药物医嘱条目",
+    "period_anchor": "order",
+    "rule_conflict": null,
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [],
+          "page_categories": [
+            "orders",
+            "consultation",
+            "progress"
+          ],
+          "event_types": [
+            "order"
+          ],
+          "target_fields": [
+            "order_id",
+            "order_category",
+            "order_type",
+            "content",
+            "stop_time",
+            "drug_name",
+            "nursing_level",
+            "is_medication",
+            "event_date",
+            "record_date",
+            "stop_date"
+          ],
+          "aliases": []
+        },
+        {
+          "document_types": [],
+          "page_categories": [
+            "orders",
+            "consultation",
+            "progress"
+          ],
+          "event_types": [
+            "consultation"
+          ],
+          "target_fields": [
+            "consultation_id",
+            "urgency",
+            "arrival_time",
+            "completion_time",
+            "opinion",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "order",
+          "consultation"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "特殊级抗菌药物医嘱条目"
+      },
+      "denominator": {
+        "event_types": [
+          "order",
+          "consultation"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "特殊级抗菌药物医嘱条目"
+      },
+      "calculation_rules": {},
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": [
+      "医院特殊使用级抗菌药物名单"
+    ]
   },
   {
     "id": "core_34",
@@ -2247,7 +4906,7 @@
       "notes": "工作表1!G35",
       "hospital_notes": "工作表1!H35"
     },
-    "unit": "输血例次",
+    "unit": "输血治疗事件",
     "required_measures": [
       "numerator",
       "denominator"
@@ -2264,10 +4923,6 @@
       "progress",
       "nursing"
     ],
-    "counting_unit": "输血治疗事件",
-    "period_anchor": "transfusion",
-    "rule_conflict": "提示按医嘱条数统计，定义按输血治疗例次；采用实际输血事件，需医院确认。",
-    "external_requirements": [],
     "fact_fields": {
       "transfusion": {
         "transfusion_id": "text",
@@ -2283,7 +4938,77 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "输血治疗事件",
+    "period_anchor": "transfusion",
+    "rule_conflict": "提示按医嘱条数统计，定义按输血治疗例次；采用实际输血事件，需医院确认。",
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [],
+          "page_categories": [
+            "orders",
+            "progress",
+            "nursing"
+          ],
+          "event_types": [
+            "transfusion"
+          ],
+          "target_fields": [
+            "transfusion_id",
+            "end_time",
+            "intraoperative",
+            "autologous",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        },
+        {
+          "document_types": [],
+          "page_categories": [
+            "orders",
+            "progress",
+            "nursing"
+          ],
+          "event_types": [
+            "transfusion_assessment"
+          ],
+          "target_fields": [
+            "assessment",
+            "norm_compliant",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "transfusion",
+          "transfusion_assessment"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "输血治疗事件"
+      },
+      "denominator": {
+        "event_types": [
+          "transfusion",
+          "transfusion_assessment"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "输血治疗事件"
+      },
+      "calculation_rules": {},
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": []
   },
   {
     "id": "core_35",
@@ -2301,7 +5026,7 @@
       "notes": "工作表1!G36",
       "hospital_notes": "工作表1!H36"
     },
-    "unit": "术中输血患者",
+    "unit": "术中输血患者住院人次",
     "required_measures": [
       "numerator",
       "denominator"
@@ -2319,12 +5044,6 @@
       "anesthesia",
       "orders",
       "progress"
-    ],
-    "counting_unit": "术中输血患者住院人次",
-    "period_anchor": "admission",
-    "rule_conflict": null,
-    "external_requirements": [
-      "自体血回输证据（PDF无记录时需输血资料）"
     ],
     "fact_fields": {
       "admission": {
@@ -2362,6 +5081,116 @@
         "event_date": "date",
         "record_date": "date"
       }
-    }
+    },
+    "counting_unit": "术中输血患者住院人次",
+    "period_anchor": "admission",
+    "rule_conflict": null,
+    "retrieval_version": "expert-guided-retrieval-v1",
+    "retrieval": {
+      "sources": [
+        {
+          "document_types": [],
+          "page_categories": [
+            "surgery",
+            "anesthesia",
+            "orders",
+            "progress"
+          ],
+          "event_types": [
+            "admission"
+          ],
+          "target_fields": [
+            "patient_id",
+            "episode_id",
+            "department",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        },
+        {
+          "document_types": [],
+          "page_categories": [
+            "surgery",
+            "anesthesia",
+            "orders",
+            "progress"
+          ],
+          "event_types": [
+            "surgery"
+          ],
+          "target_fields": [
+            "surgery_id",
+            "procedure_name",
+            "procedure_code",
+            "grade",
+            "end_time",
+            "surgeon",
+            "surgeon_id",
+            "planned_surgeon",
+            "planned_surgeon_id",
+            "planned_procedure",
+            "procedure_consistent",
+            "unplanned",
+            "reoperation",
+            "emergency_lifesaving",
+            "intraoperative_transfusion",
+            "autotransfusion",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        },
+        {
+          "document_types": [],
+          "page_categories": [
+            "surgery",
+            "anesthesia",
+            "orders",
+            "progress"
+          ],
+          "event_types": [
+            "transfusion"
+          ],
+          "target_fields": [
+            "transfusion_id",
+            "end_time",
+            "intraoperative",
+            "autologous",
+            "event_date",
+            "record_date"
+          ],
+          "aliases": []
+        }
+      ],
+      "numerator": {
+        "event_types": [
+          "admission",
+          "surgery",
+          "transfusion"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "术中输血患者住院人次"
+      },
+      "denominator": {
+        "event_types": [
+          "admission",
+          "surgery",
+          "transfusion"
+        ],
+        "fields": [],
+        "conditions": [],
+        "counting_unit": "术中输血患者住院人次"
+      },
+      "calculation_rules": {},
+      "missing_data_policy": "待核验",
+      "require_evidence": true,
+      "notes": [],
+      "conflicts": []
+    },
+    "external_requirements": [
+      "自体血回输证据（PDF无记录时需输血资料）"
+    ]
   }
 ]
