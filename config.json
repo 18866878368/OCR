@@ -2,8 +2,22 @@
   "indicator_set": "core",
   "calculation_engine": "core35",
   "extraction_mode": "rules",
+  "semantic_assist": {
+    "enabled": false
+  },
   "hospital_reference_file": null,
   "high_cost_threshold": 200000,
+  "prompt_metrics": {
+    "enabled": true,
+    "provider": "deepseek",
+    "base_url": "https://api.deepseek.com",
+    "model": "deepseek-flash",
+    "key_env": "DEEPSEEK_API_KEY",
+    "timeout_seconds": 600,
+    "max_output_tokens": 16384,
+    "max_retries": 0,
+    "max_input_chars": 240000
+  },
   "data_dir": "data",
   "work_dir": "work",
   "report_dir": "outputs/reports",

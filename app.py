@@ -8,6 +8,7 @@ from medocr.report import export_report
 from medocr.rules import batch_report
 from medocr.store import Store
 from medocr.rule_extract import batch_mode
+from medocr.specs import active_metrics, core_specs
 from medocr.ui_common import action
 from medocr.ui_workflow import (add_cases, case_labels, chinese_csv, jobs_table,
                                queue_existing_cases, summary_rows, worker_running)
@@ -115,15 +116,17 @@ def processing_page():
             if action(import_inputs):
                 st.rerun()
     st.subheader('2 · 开始处理')
-    st.write('默认识别所有页面，再按明确字段和文书规则提取指标要素。证据不足的项目保持未知；已完成步骤自动复用。')
+    st.write('默认识别所有页面，再按明确字段和文书规则提取指标要素。勾选语义模型后，除规则优先的8项外，其余核心指标会使用Prompt进行语义核验；证据不足的项目保持未知。已完成步骤自动复用。')
     running = bool(bid and worker_running(store,bid))
     jobs = store.all('SELECT * FROM jobs WHERE batch_id=?',(bid,)) if bid else []
     worker = store.one('SELECT * FROM batch_workers WHERE batch_id=?',(bid,)) if bid else None
     done = bool(jobs and all(j['stage'] in {'complete','partial'} for j in jobs))
-    assist = st.checkbox('使用本机语义模型辅助疑难片段（可选）',
-                         value=bool(bid and batch_mode(store,bid,config)=='assisted' and config['llm'].get('enabled')),
-                         disabled=running or not config['llm'].get('enabled'),key='semantic_assist_'+str(bid))
-    st.caption('不勾选即可完成规则提取，无需启动 Ollama。勾选后只辅助规则未解决的文书类型，结果仍需核对。')
+    model_enabled = bool(config.get('prompt_metrics', {}).get('enabled') or
+                         (config.get('semantic_assist', {}).get('enabled') and config.get('llm', {}).get('enabled')))
+    assist = st.checkbox('启用Prompt复杂指标及可选本地语义辅助',
+                         value=bool(bid and batch_mode(store,bid,config)=='assisted' and model_enabled),
+                         disabled=running or not model_enabled,key='semantic_assist_'+str(bid))
+    st.caption('不勾选即可完成规则提取。勾选后优先使用Prompt配置调用DeepSeek计算复杂指标；本地Ollama只作为事实抽取辅助，模型结果仍需核对。')
     left,right = st.columns([3,1])
     label = '继续处理' if (worker and worker['state'] in {'stopped','error'}) or (jobs and any(j['stage'] in {'error','partial','ocr','extracting'} for j in jobs)) else '开始处理'
     if left.button(label,type='primary',disabled=not bool(bid and (cases or jobs)) or running,key='start_processing'):
@@ -166,18 +169,43 @@ def results_page():
         st.info('自动初判仅供核对；“待补充 / 待复核”表示证据或统计条件不足。')
     st.dataframe(rows,hide_index=True,width='stretch')
     st.download_button('下载指标汇总（Excel 可打开）',chinese_csv(rows),'35项指标汇总.csv','text/csv')
-    with st.expander('查看某项指标的计算依据'):
+    with st.expander('指标详情', expanded=True):
+        from medocr.review_ui import show_extraction_guidance, show_indicator_results, show_calculation_card, show_trace_layers
         mid = st.selectbox('选择指标',[s['metric_id'] for s in report['summary']],key='result_metric',format_func=lambda x:next(s['name'] for s in report['summary'] if s['metric_id']==x))
         summary = next(s for s in report['summary'] if s['metric_id']==mid)
-        prefix = 'draft_' if draft else ''
-        missing = summary.get(prefix+'missing',[])
-        if missing:
-            st.write('**待解决事项**')
-            for item in missing:
-                st.write('• '+item)
-        selected = [d for d in report['details'] if d['metric_id']==mid and d.get('calculation_mode')==('draft' if draft else 'reviewed')]
+        metric = next((m for m in core_specs() if m['id']==mid),None)
+        if metric is None:
+            metric = next((m for m in active_metrics(config) if m['id']==mid),None)
+        show_calculation_card(summary, draft, metric)
+        if metric:
+            st.markdown('**指标定义与计算口径**')
+            st.write(metric.get('formula') or '暂无公式')
+            if metric.get('notes'):
+                st.caption(metric['notes'])
+            show_extraction_guidance(metric)
+        allowed_modes = {'draft', 'prompt'} if draft else {'reviewed'}
+        selected = [d for d in report['details'] if d['metric_id']==mid and d.get('calculation_mode') in allowed_modes]
+        if summary['calculation_source'] == 'manual':
+            selected = []
         labels = case_labels(store,bid)
-        st.dataframe([{'病例':labels.get(d['case_id'],'补充统计'),'分母贡献':d.get('denominator'),'分子贡献':d.get('numerator'),'判定依据':d.get('reason'),'证据':d.get('evidence')} for d in selected],hide_index=True,width='stretch')
+        if selected and summary['kind'] in {'rate', 'ratio'}:
+            with st.expander('各病例统计贡献'):
+                st.dataframe([{'病例':labels.get(d['case_id'],'补充统计'),
+                               '分母贡献':d.get('denominator'),'分子贡献':d.get('numerator'),
+                               '判定依据':d.get('reason')} for d in selected],hide_index=True,width='stretch')
+        case_ids = list(dict.fromkeys(d['case_id'] for d in selected if d.get('case_id') in labels))
+        case_details = []
+        if case_ids:
+            selected_case = st.selectbox('选择病例查看判定明细',case_ids,
+                                         format_func=labels.get,
+                                         key='result_evidence_case_'+mid)
+            case_details = [d for d in selected if d.get('case_id') == selected_case]
+            show_indicator_results(case_details, metric)
+        elif summary['calculation_source'] == 'manual' and not draft:
+            st.info('本批次使用医院补充统计，来源见开发/审计详情。')
+        else:
+            st.info('当前指标没有病例级自动明细；如有补充统计值，请在“核对与复核 → 补充资料”查看来源。')
+        show_trace_layers(store, case_details, metric, summary, draft)
     with st.expander('导出完整证据与明细'):
         if st.button('保存完整本地报告'):
             folder = action(lambda:export_report(store,bid,config))

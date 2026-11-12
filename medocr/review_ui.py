@@ -19,6 +19,8 @@ from medocr.fields_ui import edit_fields, parse_fields
 from medocr.relations import confirm_relation, RELATION_LABELS
 from medocr.identity import possible_duplicate_admissions
 from medocr.ui_common import FACT_LABELS, action, display_rows, save_local_settings
+from medocr.ui_workflow import format_value
+from medocr.prompt_metrics import prompt_explanation
 
 def show_extraction_guidance(metric):
     with st.expander('医院提供的分子、分母提取指导', expanded=False):
@@ -51,6 +53,260 @@ def show_extraction_guidance(metric):
                 st.caption('补充资料要求：'+'；'.join(spec['external_requirements']))
         else:
             st.caption('此附加指标使用人工判定或补充统计数据。')
+
+
+def _detail_evidence(detail):
+    """Return normalized evidence references from a rule or Prompt detail."""
+    evidence = detail.get('evidence', [])
+    if isinstance(evidence, str):
+        try:
+            evidence = json.loads(evidence)
+        except (TypeError, ValueError):
+            evidence = []
+    if isinstance(evidence, dict):
+        evidence = evidence.get('references') or evidence.get('evidence')
+    return evidence if isinstance(evidence, list) else []
+
+
+def _review_evidence_value(note, automatic_details, item_key):
+    """Persist page-locatable references together with the review note."""
+    refs = []
+    for detail in automatic_details:
+        if detail.get('item_key') == item_key:
+            refs = _detail_evidence(detail)
+            if refs:
+                break
+    note = str(note or '').strip()
+    if not refs:
+        return note
+    payload = {'references': refs}
+    if note:
+        payload['note'] = note
+    return json.dumps(payload, ensure_ascii=False)
+
+
+def _calculation_reasons(detail):
+    """Return the object-specific numerator and denominator explanations."""
+    if detail.get('origin') == 'prompt':
+        explanation = prompt_explanation(detail)
+        return (explanation['numerator_reason'] or '模型未单独提供分子理由',
+                explanation['denominator_reason'] or '模型未单独提供分母理由')
+    numerator = detail.get('numerator')
+    denominator = detail.get('denominator')
+    reason = str(detail.get('reason') or '').strip()
+    numerator_reason = str(detail.get('numerator_reason') or '').strip()
+    denominator_reason = str(detail.get('denominator_reason') or '').strip()
+    if not numerator_reason:
+        numerator_reason = reason or ('未提供分子判定依据，分子为' + str(numerator) if numerator is not None else '分子资格或判定未知')
+    if not denominator_reason:
+        if detail.get('item_key') in {'admission', 'case'} and denominator == 1:
+            denominator_reason = '本次住院计入分母。'
+        elif denominator is None:
+            denominator_reason = '未能确认分母资格或统计对象'
+        elif denominator == 0:
+            denominator_reason = '该统计对象的分母贡献为 0。'
+        else:
+            denominator_reason = f'该统计对象计入分母，分母贡献为{denominator}。'
+    return numerator_reason, denominator_reason
+
+
+def _trace_pages(refs):
+    pages = sorted({str(ref.get('page')) for ref in refs if isinstance(ref, dict) and ref.get('page') is not None},
+                   key=lambda page: (not page.isdecimal(), int(page) if page.isdecimal() else page))
+    return '、'.join(pages) if pages else '未定位'
+
+
+def _format_calculation(summary, draft):
+    prefix = 'draft_' if draft else ''
+    n, d, value = summary.get(prefix+'numerator'), summary.get(prefix+'denominator'), summary.get(prefix+'value')
+    kind = summary['kind']
+    if summary.get(prefix+'status') == '不适用':
+        return '不适用'
+    rendered = format_value(value, kind)
+    if kind == 'median':
+        return f'{rendered}（应统计 {d} 条）' if d is not None else rendered
+    if kind == 'rate_ratio':
+        measures = summary.get(prefix+'measures') or {}
+        parts = [measures.get(key) for key in ('four_success', 'four_total', 'three_success', 'three_total')]
+        if all(part is not None for part in parts):
+            four_n, four_d, three_n, three_d = parts
+            return f'四级 {four_n}/{four_d}，三级 {three_n}/{three_d}。结果 {rendered}'
+    if n is not None and d is not None:
+        if value is not None and d:
+            return f'{n} / {d} = {rendered}'
+        unknown = summary.get(prefix+'unknown_denominator_groups') or summary.get(prefix+'unknown_numerator_objects')
+        if n or d or not unknown:
+            return f'{rendered}（已记录的贡献：分子 {n}，分母 {d}）'
+    return rendered
+
+
+def show_calculation_card(summary, draft, metric=None):
+    """Show the batch result and what staff need to verify."""
+    prefix = 'draft_' if draft else ''
+    status = summary.get(prefix+'status') or '暂无自动初判'
+    st.markdown('### 结果展示')
+    st.info(_format_calculation(summary, draft) + f' · {status}')
+    if summary.get(prefix+'missing'):
+        st.warning('待确认：' + '；'.join(map(str, summary[prefix+'missing'])))
+        requirements = (metric or {}).get('external_requirements')
+        if requirements:
+            st.write('所需院内资料：' + '；'.join(requirements))
+
+
+def show_trace_layers(store, details, metric, summary=None, draft=True):
+    """Show the selected object's trace and the batch calculation inputs."""
+    metric = metric or {}
+    prefix = 'draft_' if draft else ''
+    with st.expander('开发/审计详情：五层计算过程', expanded=False):
+        detail = None
+        trace = {}
+        if details:
+            case_id = details[0].get('case_id') or ''
+            trace_key = f"trace_object_{metric.get('id')}_{case_id}_{draft}"
+            index = st.selectbox('选择统计对象', range(len(details)),
+                                 format_func=lambda i: details[i]['item_key'], key=trace_key)
+            detail = details[index]
+            trace = detail.get('calculation_trace') or {}
+        st.markdown('**1. 指标口径**')
+        st.write(metric.get('formula') or trace.get('counting_rule') or '暂无公式')
+        st.caption('统计单位：' + str(metric.get('counting_unit') or metric.get('unit') or '当前指标对象'))
+        if metric.get('external_requirements'):
+            st.write('所需外部资料：' + '；'.join(metric['external_requirements']))
+
+        st.markdown('**2. 事实提取路径**')
+        retrieval = trace.get('retrieval') or metric.get('retrieval') or {}
+        sources = retrieval.get('sources', [])
+        for source in sources:
+            docs = '、'.join(source.get('document_types') or source.get('page_categories', [])) or '相关文书'
+            fields = '、'.join(source.get('target_fields', [])) or '相关字段'
+            st.write(f'从【{docs}】提取：{fields}')
+        if not sources:
+            st.caption('当前指标没有配置病历字段提取路径。')
+
+        st.markdown('**3. 候选对象**')
+        objects = trace.get('objects') or []
+        if objects:
+            st.dataframe(display_rows(objects), hide_index=True, width='stretch')
+        else:
+            st.caption('当前指标没有单独的候选对象明细。')
+
+        st.markdown('**4. 逐步判断**')
+        steps = trace.get('steps') or []
+        if steps:
+            st.dataframe([{'步骤': s.get('label'), '结果': str(s.get('value')), '证据页': _trace_pages(s.get('evidence') or [])}
+                          for s in steps], hide_index=True, width='stretch')
+        else:
+            st.caption('当前指标没有保存逐步判断。')
+
+        st.markdown('**5. 汇总公式**')
+        if trace:
+            st.write('对象明细：' + str(trace['calculation']['expression']))
+        if summary is not None:
+            st.write(_format_calculation(summary, draft))
+            values = summary.get(prefix+'measures')
+            if values:
+                st.json(values, expanded=False)
+            if not draft and summary.get('calculation_source') == 'manual':
+                st.dataframe(summary.get('sources', []), hide_index=True, width='stretch')
+        if detail is not None:
+            st.markdown('**原始 PDF 与 OCR 原文**')
+            _show_source_pages(store, detail, f'{trace_key}_{index}')
+
+
+def show_indicator_results(details, metric=None):
+    """Show case contributions and reasons in the result section."""
+    if not details:
+        st.info('当前指标还没有病例判定明细。')
+        return
+    st.markdown('### 病例判定明细')
+    payload = details[0].get('prompt_payload') or {}
+    if isinstance(payload, dict) and len(payload.get('objects') or []) > 1:
+        overall = prompt_explanation(payload)
+        if overall['reason']:
+            st.write('**本病例指标总体说明：** ' + overall['reason'])
+    for index, detail in enumerate(details, 1):
+        item_key = detail.get('item_key') or f'对象{index}'
+        numerator = detail.get('numerator')
+        denominator = detail.get('denominator')
+        is_prompt = detail.get('origin') == 'prompt'
+        origin = '已复核' if detail.get('reviewer') else ('Prompt' if is_prompt else '规则')
+        title = ('统计对象完整性' if item_key == 'coverage_unknown' else f'第 {index} 条 · {origin}')
+        is_count = not metric or metric.get('kind') in {'rate', 'ratio'}
+        with st.expander(title, expanded=index == 1):
+            payload = detail.get('prompt_payload') if isinstance(detail.get('prompt_payload'), dict) else {}
+            if is_count:
+                n = numerator if numerator is not None else '未知'
+                d = denominator if denominator is not None else '未知'
+                st.write(f'**分子贡献 {n} · 分母贡献 {d}**')
+                if is_prompt:
+                    st.write('**判定理由：** ' + (detail.get('reason') or '模型未提供该对象的判定理由'))
+                if not is_prompt or detail.get('numerator_reason') or detail.get('denominator_reason'):
+                    numerator_reason, denominator_reason = _calculation_reasons(detail)
+                    st.write('**分子理由：** ' + numerator_reason)
+                    st.write('**分母理由：** ' + denominator_reason)
+            else:
+                st.write(detail.get('reason') or '未记录判定依据')
+            analysis = prompt_explanation(detail)['analysis']
+            if analysis and analysis != detail.get('reason'):
+                st.write('**模型分析：** ' + analysis)
+            trace = detail.get('calculation_trace') or {}
+            for step in trace.get('steps', []):
+                if step['label'] in {'判定依据', '人工复核依据', '分母贡献', '分子贡献', '分子判定依据', '分母判定依据'}:
+                    continue
+                refs = step.get('evidence') or []
+                source = f'（来源第{_trace_pages(refs)}页）' if refs else ''
+                st.write(f"**{step['label']}：** {step['value']}{source}")
+            if trace.get('unknowns'):
+                st.warning('尚待确认：' + '；'.join(map(str, trace['unknowns'])))
+            if payload.get('conflicts'):
+                st.warning('口径冲突：' + '；'.join(map(str, payload['conflicts'])))
+            st.caption('证据页：' + _trace_pages(_detail_evidence(detail)))
+
+
+def _show_source_pages(store, detail, widget_key):
+    review_evidence = str(detail.get('review_evidence') or '').strip()
+    if review_evidence:
+        st.caption('复核记录中的证据说明：' + review_evidence)
+    evidence = _detail_evidence(detail)
+    if not evidence:
+        st.info('这条判定没有保存可定位的原文证据。')
+        return
+    if detail.get('evidence_source') == 'draft_candidate':
+        st.caption('以下原文来自自动初判候选，供复核定位。')
+    pages = store.pages(detail['case_id'])
+    for index, ref in enumerate(evidence, 1):
+        if not isinstance(ref, dict):
+            st.warning(f'第 {index} 条证据格式无效。')
+            continue
+        document_id = ref.get('document_id')
+        try:
+            page_number = int(ref.get('page'))
+        except (TypeError, ValueError):
+            page_number = None
+        matches = [page for page in pages if page['page'] == page_number
+                   and (not document_id or page['document_id'] == document_id)]
+        location = f'PDF 第 {page_number} 页' if page_number is not None else '页码未定位'
+        purpose = ref.get('purpose')
+        st.markdown(f'**依据 {index}：{location}**' + (f' · {purpose}' if purpose else ''))
+        if document_id:
+            st.caption('文档：' + str(document_id))
+        st.code(ref.get('quote') or '', language=None)
+        if not matches:
+            st.warning('当前病例中找不到对应页，可能是页码无效或 OCR 页面已变化。')
+            continue
+        if len(matches) > 1:
+            st.warning('多个 PDF 使用此页码，证据未标注文档，以下为第一个匹配页。')
+        page = matches[0]
+        key = f'{widget_key}_{index}'
+        if st.checkbox('显示依据所在 PDF 原页', key=f'indicator_page_{key}'):
+            try:
+                st.image(render_page(page['path'], page['page'], 120),
+                         caption=f'原始 PDF 第 {page["page"]} 页', width='stretch')
+            except Exception as exc:
+                st.error(f'原始 PDF 页面无法显示：{type(exc).__name__}')
+        if st.checkbox('查看该页 OCR 全文', key=f'indicator_ocr_toggle_{key}'):
+            st.text_area('OCR 原文', page.get('text', ''), height=220,
+                         disabled=True, key=f'indicator_ocr_{key}')
 
 def render_review(store, config, bid, cid, section):
     pages = store.pages(cid)
@@ -89,32 +345,57 @@ def render_review(store, config, bid, cid, section):
         st.caption(f'当前可用 {len(all_events)-len(history)} 条；历史或已隔离 {len(history)} 条。历史记录可查看，逐条核对并确认后才可作为人工事实使用。')
         events = all_events if show_history else [e for e in all_events if e['eligible_in_mode']]
         if events:
-            st.dataframe([{'要素ID':e['id'],'类型':FACT_LABELS.get(e['kind'],e['kind']),'事件时间':e['event_time'],'记录时间':e['record_time'],
-                           '来源页':e['page'],'已复核':bool(e['verified']),'来源已变化':bool(e['attributes'].get('_stale')),
+            event_rows = [{'要素ID':e['id'][:10],'类型':FACT_LABELS.get(e['kind'],e['kind']),'事件时间':e['event_time'],'记录时间':e['record_time'],
+                           '来源页':e['page'],'已复核':'是' if e['verified'] else '否','来源已变化':'是' if e['attributes'].get('_stale') else '否',
                            '候选范围':{'current':'当前候选','reviewed':'已复核','history':'历史/已隔离'}[e['candidate_scope']],
-                           '隔离原因':e['scope_reason'],
                            '需核对字段':'；'.join(e['attributes'].get('_validation_issues',[])),
-                           '提取值':json.dumps({k:v for k,v in e['attributes'].items() if not k.startswith('_')},ensure_ascii=False)} for e in events],hide_index=True)
-            with st.expander('批量确认已核对的要素'):
-                pending = [e for e in events if e['eligible_in_mode'] and not e['verified']]
-                with st.form('bulk_fact_review'):
-                    ids = st.multiselect('选择已逐条查看原文/原图的要素',[e['id'] for e in pending],format_func=lambda x:next(FACT_LABELS.get(e['kind'],e['kind'])+' · 第'+str(e['page'])+'页 · '+x[:8] for e in pending if e['id']==x))
-                    confirmed = st.checkbox('我已核对所选要素的提取值、时间含义及关联关系')
-                    note = st.text_input('批量复核说明')
-                    reviewer = st.text_input('批量复核人')
-                    submitted = st.form_submit_button('确认选中要素')
-                if submitted:
-                    def bulk_verify():
-                        if not confirmed or not ids or not note.strip() or not reviewer.strip():
-                            raise ValueError('请选择已核对的要素并填写复核人和说明')
-                        for eid in ids:
-                            e = next(e for e in pending if e['id']==eid)
-                            store.review_event(eid,{'verified':True,'attributes':{**e['attributes'],'review_note':note}},reviewer)
-                        return '已确认'+str(len(ids))+'条要素；空值仍保留为未知'
-                    action(bulk_verify)
+                           '提取值':json.dumps({k:v for k,v in e['attributes'].items() if not k.startswith('_')},ensure_ascii=False)} for e in events]
+            # The table is the main work area.  Select one or more rows and
+            # use the action bar directly underneath; no long event picker is
+            # needed for routine review.
+            table = st.dataframe(event_rows, hide_index=True, use_container_width=True,
+                                 height=520, selection_mode='multi-row', on_select='rerun',
+                                 key='fact_table_'+cid)
+            selected_rows = list(getattr(table.selection, 'rows', [])) if table else []
+            selected_key = 'review_selected_event_'+cid
+            selected_ids = [events[i]['id'] for i in selected_rows if i < len(events)]
+            if selected_ids:
+                st.session_state['review_selected_events_'+cid] = selected_ids
+                st.session_state[selected_key] = selected_ids[0]
+            else:
+                selected_ids = st.session_state.get('review_selected_events_'+cid, [])
+            selected_id = st.session_state.get(selected_key)
+            selected_event = next((e for e in events if e['id']==selected_id), events[0])
+            st.markdown('#### 选中事实的处理')
+            st.caption(f'已选中 {len(selected_ids)} 条。可批量确认或隔离；详细编辑默认针对第一条选中事实。')
+            action_note_col, reviewer_col, confirm_col, disable_col = st.columns([2.4, 1.2, 1, 1])
+            action_note = action_note_col.text_input('处理说明',key='fact_action_note_'+cid,placeholder='例如：已核对原文第11页')
+            reviewer = reviewer_col.text_input('复核人',key='fact_action_reviewer_'+cid)
+            with confirm_col:
+                confirm_selected = st.button('确认选中',disabled=not selected_ids,key='confirm_selected_'+cid)
+            with disable_col:
+                disable_selected = st.button('隔离选中',disabled=not selected_ids,key='disable_selected_'+cid)
+            if confirm_selected or disable_selected:
+                def apply_selected():
+                    if not action_note.strip() or not reviewer.strip():
+                        raise ValueError('请填写处理说明和复核人')
+                    for eid in selected_ids:
+                        e = next(e for e in events if e['id']==eid)
+                        attrs = {**e['attributes'],'review_note':action_note}
+                        store.review_event(eid,{'verified':confirm_selected,'active':not disable_selected,'attributes':attrs},reviewer)
+                    return ('已确认' if confirm_selected else '已隔离')+str(len(selected_ids))+'条事实'
+                action(apply_selected)
+            with st.expander('查看选中事实原文',expanded=bool(selected_ids)):
+                for eid in selected_ids[:20]:
+                    e = next(e for e in events if e['id']==eid)
+                    st.markdown(f"**{FACT_LABELS.get(e['kind'],e['kind'])} · 第{e['page']}页 · {e['id'][:10]}**")
+                    st.code(e['quote'],language=None)
         if events:
-            eid = st.selectbox('候选事件',[e['id'] for e in events],format_func=lambda x:next(f"{FACT_LABELS.get(e['kind'],e['kind'])} · {e['event_time'] or e['record_time'] or '时间未知'} · 第{e['page']}页 · {'已复核' if e['verified'] else '候选'}" for e in events if e['id']==x))
+            eid = st.session_state.get('review_selected_event_'+cid, events[0]['id'])
+            if eid not in {e['id'] for e in events}:
+                eid = events[0]['id']
             event = next(e for e in events if e['id']==eid)
+            st.markdown('### 事实详情与复核')
             if not event['eligible_in_mode']:
                 st.warning(event['scope_reason']+'。此记录未进入当前自动计算；确认前请核对当前原文与事件身份。')
             st.code(event['quote'],language=None)
@@ -218,9 +499,15 @@ def render_review(store, config, bid, cid, section):
                         store.set_coverage(bid,cid,metric_id,True,coverage_note,coverage_reviewer)
                     return '已保存对象完整性；未确认或缺失的字段仍会阻止计算'
                 action(save_coverage)
-        automatic_details = [r for r in batch_report(store,bid,config)['details'] if r['case_id']==cid and r['metric_id']==mid and r.get('calculation_mode')=='draft']
+        report = batch_report(store,bid,config)
+        automatic_details = [r for r in report['details']
+                             if r['case_id']==cid and r['metric_id']==mid
+                             and r.get('calculation_mode') in {'draft','prompt'}]
+        show_indicator_results(automatic_details, metric)
+        show_trace_layers(store, automatic_details, metric)
         if automatic_details:
-            st.dataframe(display_rows(automatic_details),hide_index=True)
+            st.dataframe(display_rows([{k:v for k,v in row.items() if k!='calculation_trace'}
+                                       for row in automatic_details]),hide_index=True)
         if metric['kind'] in {'rate','ratio'}:
             st.dataframe(store.all('SELECT item_key,denominator,numerator,reason,evidence,reviewer FROM reviews WHERE batch_id=? AND case_id=? AND metric_id=?',(bid,cid,mid)),hide_index=True)
             with st.form('metric_review_'+bid+cid+mid):
@@ -237,7 +524,8 @@ def render_review(store, config, bid, cid, section):
                 save = st.form_submit_button('保存此对象判定')
             if save:
                 def save_judgment():
-                    store.save_review(bid,cid,mid,item,None if du else int(d),None if nu else int(n),reason,evidence,reviewer)
+                    stored_evidence = _review_evidence_value(evidence, automatic_details, item)
+                    store.save_review(bid,cid,mid,item,None if du else int(d),None if nu else int(n),reason,stored_evidence,reviewer)
                     if mid not in {'core_01','core_02'}:
                         store.set_coverage(bid,cid,mid,complete,evidence,reviewer)
                     return '判定与覆盖状态已保存'

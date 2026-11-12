@@ -7,7 +7,7 @@
 - 持久化批量队列、后台处理、停止/继续、页面与语义块缓存；单份失败不阻断其余病例。
 - PDF 文字层提取、扫描页 PaddleOCR、页面分类；批处理默认识别全册，数据库保存本地 PDF 快照。
 - 规则优先：按明确的文书标题、字段标签、医嘱列标题提取候选，区分开立、执行、停止与记录时间；用明确业务编号关联事件。
-- 可选本机语义辅助：仅处理规则未解决的事实类型及关联；不替换同一事件已有的规则值。院方 Excel 的分子、分母提取指导已纳入辅助提示词与界面。
+- 可选语义辅助：复用现有 OCR 分页和页码证据，对除 `core_01、02、05、07、09、13、15、17` 外的核心指标调用 DeepSeek Prompt 生成候选。模型候选不会覆盖已复核规则值，证据不足保留为未知；本地小模型事实辅助可单独开启。
 - 35 项规则计算：事件/住院人次计数、医师时间重合、三级/四级发生率比、术种去重、新项目留存、中位数。
 - 中文字段复核、人工关联、对象完整性核查、口径确认、医院补充明细与汇总值导入、修改审计。
 - JSON、Excel 可打开的 CSV：指标汇总、逐病例/事件判定、事实证据、处理检查点。
@@ -41,7 +41,7 @@ python -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501 --b
 ## 医生使用流程
 
 1. 在“处理病例”选择一份或多份病例 PDF，点击“导入病例”。也可展开路径栏，填写单份病例路径或专用病例目录。一个 PDF 默认代表一次住院。
-2. 默认不勾选“使用本机语义模型辅助疑难片段（可选）”，点击“开始处理”。系统在本机完成全册 OCR、规则提取与 35 项初判；无需 Ollama。需要处理疑难片段时勾选辅助，模型不可用时仍完成规则提取并提示辅助待重试。
+2. 默认不勾选“启用Prompt复杂指标及可选本地语义辅助”，点击“开始处理”。系统在本机完成全册 OCR、规则提取与 8 项规则优先指标初判。需要计算其余复杂指标时勾选辅助，系统复用已保存的 OCR 分页调用 DeepSeek Prompt，模型不可用时仍保留规则提取结果并提示 Prompt 待重试。
 3. 点击“查看 35 项指标”。默认显示自动初判，切换可查看已复核结果。缺少条件时显示待补充；不完整的分子、分母会明确标注。
 4. 需要检查证据时进入“核对与复核”，依次核对原文、事实和指标。这里保留对象完整性确认、口径确认、补充资料和同次住院合并。
 5. 模型连接、医院参考目录及诊断记录集中放在“设置”。已配置的本机模型不用每次填写。下载汇总 CSV，或展开完整导出保存证据明细。
@@ -53,24 +53,24 @@ python -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501 --b
 先确认环境，不读取病例也不下载模型：
 
 ~~~powershell
-python -m medocr doctor
-python -m medocr specs
+python -m medocr.cli doctor
+python -m medocr.cli specs
 ~~~
 
 如界面已保存设置，命令行需要显式指定 config.local.json：
 
 ~~~powershell
-python -m medocr --config config.local.json run --input 'F:\病例专用目录' --batch-name '月度病例' --start 2025-04-01 --end 2025-04-30
+python -m medocr.cli --config config.local.json run --input 'F:\病例专用目录' --batch-name '月度病例' --start 2025-04-01 --end 2025-04-30
 ~~~
 
 也可先入队再处理。将 BATCH_ID 换成入队返回的真实批次 ID：
 
 ~~~powershell
-python -m medocr --config config.local.json queue --input 'F:\病例专用目录' --batch-name '月度病例' --start 2025-04-01 --end 2025-04-30
-python -m medocr --config config.local.json process-batch --batch BATCH_ID
-python -m medocr --config config.local.json jobs --batch BATCH_ID
-python -m medocr --config config.local.json stop --batch BATCH_ID
-python -m medocr --config config.local.json report --batch BATCH_ID
+python -m medocr.cli --config config.local.json queue --input 'F:\病例专用目录' --batch-name '月度病例' --start 2025-04-01 --end 2025-04-30
+python -m medocr.cli --config config.local.json process-batch --batch BATCH_ID
+python -m medocr.cli --config config.local.json jobs --batch BATCH_ID
+python -m medocr.cli --config config.local.json stop --batch BATCH_ID
+python -m medocr.cli --config config.local.json report --batch BATCH_ID
 ~~~
 
 以上默认规则模式。需要本机语义辅助时，在 run 或 process-batch 命令末尾添加 --llm。停止在当前页面或模型请求完成后生效。再次 process-batch 会继续；成功页面/块使用缓存。模型、参考资料或代码版本变化会重新评估提取缓存，人工复核记录保留。
@@ -94,7 +94,7 @@ python -m medocr --config config.local.json report --batch BATCH_ID
 ~~~
 
 ~~~powershell
-python -m medocr --config config.local.json import-facts --batch BATCH_ID --file '医院补充明细.json' --reviewer '复核人'
+python -m medocr.cli --config config.local.json import-facts --batch BATCH_ID --file '医院补充明细.json' --reviewer '复核人'
 ~~~
 
 默认不直接确认事实；--verified 只用于医院已经逐条核实的明细。汇总数值导入支持 import-measures，明确标注为人工补充结果。
@@ -105,9 +105,9 @@ python -m medocr --config config.local.json import-facts --batch BATCH_ID --file
 flowchart LR
   A[一批病例PDF] --> B[本地OCR及页面分类]
   B --> C[规则提取明确字段和编号关联]
-  C --> S[可选本机语义辅助疑难片段]
+  C --> S[可选本机语义辅助及Prompt指标]
   S --> D
-  C --> D[35项规则与初判]
+  C --> D[8项规则优先指标]
   H[医院目录及台账] --> D
   C --> E[原页证据与医生复核]
   E --> F[对象完整性及口径确认]
@@ -142,6 +142,6 @@ flowchart LR
 
 病案快照、数据库在 data/，页图和上传副本在 work/，报告在 outputs/reports/。这些文件仍含患者信息，程序不自动脱敏或加密，使用医院授权本地存储。Streamlit 默认只监听回环地址并关闭使用统计。
 
-模型接口禁用代理与重定向，拒绝外部地址及含 cloud 的模型名称。Ollama 需按环境说明关闭云功能；本机服务必须确实使用下载到本机的权重。运行病例时 OCR 不自动下载模型。
+Prompt 指标默认使用 DeepSeek API。启动前设置 `DEEPSEEK_API_KEY`，例如 `$env:DEEPSEEK_API_KEY='sk-...'`；API 请求只发送当前病例的 OCR 页面和指标提示词。后续如需切换本地小模型，将 `prompt_metrics.provider` 改为 `local`，再配置本地 `llm`。运行病例时 OCR 不自动下载模型。
 
 不需要 HIS 接入，但全院资料完整性不能仅靠输入 PDF 推断。先由医生标注一小批具有阳性、阴性和缺失情况的病例，对字段准确率、事件召回、时间语义、分子分母和遗漏状态逐项验收，再扩大批量。

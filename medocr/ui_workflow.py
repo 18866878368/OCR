@@ -83,7 +83,7 @@ def jobs_table(store, batch_id):
 def format_value(value, kind):
     if value is None:
         return '待补充 / 待复核'
-    if kind in {'rate','catalog_rate'}:
+    if kind in {'rate','catalog_rate','retention'}:
         return f'{value*100:.2f}%'
     if kind=='median':
         return f'{value:g} 分钟'
@@ -96,9 +96,13 @@ def summary_rows(report, draft=True):
         count = s.get(prefix+key)
         if count is None:
             return '未知'
-        partial = s.get(prefix+'unknown_denominator_groups',0) or (key=='numerator' and s.get(prefix+'unknown_numerator_objects',0))
-        return f'{count}（尚不完整）' if partial else str(count)
-    return [{'编号':i,'指标':s['name'],'分子':contribution(s,'numerator'),
+        # The table shows the current extracted contribution.  Completeness
+        # review remains available in the status and pending-items columns;
+        # do not append a misleading suffix to the numeric contribution.
+        return str(count)
+    sources = {'prompt': 'Prompt', 'manual': '补充统计', 'rule': '规则'}
+    return [{'编号':i,'指标':s['name'],'来源':sources.get(s.get(prefix+'calculation_source'),'规则'),
+             '分子':contribution(s,'numerator'),
              '分母':contribution(s,'denominator'),
              '结果':'不适用' if s.get(prefix+'status')=='不适用' else format_value(s.get(prefix+'value'),s['kind']),
              '状态':s.get(prefix+'status',s['status']),

@@ -9,7 +9,7 @@ if (Test-Path -LiteralPath $pythonPath) {
 } elseif (Get-Command conda -ErrorAction SilentlyContinue) {
     & conda run --no-capture-output -n medocr python -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501 --browser.gatherUsageStats false --server.maxUploadSize 512
 } else {
-    Write-Host '请按 ENVIRONMENT.md 手动配置环境，或激活 medocr Conda 环境后再启动。'
+    Write-Host 'Python environment not found. Configure ENVIRONMENT.md or activate the medocr Conda environment.'
     exit 1
 }
 exit $LASTEXITCODE

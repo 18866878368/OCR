@@ -29,8 +29,9 @@ def doctor(config):
         folder = Path(config['ocr'][key])
         print(f'{key}: {"ready" if (folder/"inference.yml").is_file() else "missing"}')
     print('OCR device:',config['ocr']['device'])
-    print('Local LLM (optional):', 'configured' if config['llm']['enabled'] else 'disabled')
-    print('Default extraction: rules; --llm enables selective assistance')
+    print('Prompt provider:', config.get('prompt_metrics', {}).get('provider', 'deepseek'))
+    print('Local fact assistance:', 'enabled' if config.get('semantic_assist', {}).get('enabled') and config['llm']['enabled'] else 'disabled')
+    print('Default extraction: rules; --llm enables DeepSeek Prompt calculation for the 27 non-rule-first core metrics')
     print('配置说明：ENVIRONMENT.md；doctor 不下载模型、不导入病例。')
 
 
@@ -42,6 +43,9 @@ def main(argv=None):
     subs.add_parser('catalog')
     p = subs.add_parser('specs')
     p.add_argument('--output',default='outputs/core_specs.json')
+    p = subs.add_parser('hierarchy')
+    p.add_argument('--case',required=True)
+    p.add_argument('--output',default='outputs/hierarchy.json')
     p = subs.add_parser('queue')
     p.add_argument('--input',required=True)
     p.add_argument('--batch-name',required=True)
@@ -115,6 +119,17 @@ def main(argv=None):
             path.write_text(json.dumps(core_specs(),ensure_ascii=False,indent=2),encoding='utf-8')
             print(path.resolve()); return 0
         store = Store(config['data_dir'])
+        if args.command=='hierarchy':
+            from .segmentation import build_hierarchical_outline
+            pages = store.pages(args.case)
+            if not pages:
+                raise ValueError('病例不存在或尚未导入OCR页')
+            payload = build_hierarchical_outline(pages)
+            path = Path(args.output)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
+            print(json.dumps({'output':str(path.resolve()), 'documents':len(payload['documents'])}, ensure_ascii=False))
+            return 0
         if args.command=='queue':
             from .batch import queue_directory, enqueue
             bid = store.batch(args.batch_name,args.start,args.end)

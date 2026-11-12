@@ -3,6 +3,7 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 
 def stamp():
@@ -80,6 +81,27 @@ class Store:
           batch_id TEXT REFERENCES batches(id), metric_id TEXT, rule_hash TEXT,
           reviewer TEXT NOT NULL, note TEXT NOT NULL, updated TEXT NOT NULL,
           PRIMARY KEY(batch_id,metric_id));
+        CREATE TABLE IF NOT EXISTS prompt_metric_results(
+          batch_id TEXT REFERENCES batches(id), case_id TEXT REFERENCES cases(id),
+          metric_id TEXT NOT NULL, signature TEXT NOT NULL, status TEXT NOT NULL,
+          payload TEXT NOT NULL, error_code TEXT DEFAULT '', updated TEXT NOT NULL,
+          PRIMARY KEY(batch_id,case_id,metric_id));
+        CREATE TABLE IF NOT EXISTS prompt_result_history(
+          id TEXT PRIMARY KEY, batch_id TEXT NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
+          case_id TEXT NOT NULL, metric_id TEXT NOT NULL, signature TEXT NOT NULL,
+          model TEXT, prompt_version TEXT, status TEXT NOT NULL, raw_response TEXT,
+          payload TEXT NOT NULL, error_code TEXT NOT NULL, created TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS calculation_runs(
+          id TEXT PRIMARY KEY, batch_id TEXT NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
+          rule_version TEXT NOT NULL, scope TEXT NOT NULL, settings TEXT NOT NULL, created TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS calculation_results(
+          run_id TEXT NOT NULL REFERENCES calculation_runs(id) ON DELETE CASCADE,
+          metric_id TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(run_id,metric_id));
+        CREATE TABLE IF NOT EXISTS calculation_details(
+          run_id TEXT NOT NULL, metric_id TEXT NOT NULL, position INTEGER NOT NULL,
+          case_id TEXT, item_key TEXT, mode TEXT, payload TEXT NOT NULL,
+          PRIMARY KEY(run_id,metric_id,position),
+          FOREIGN KEY(run_id,metric_id) REFERENCES calculation_results(run_id,metric_id) ON DELETE CASCADE);
         CREATE TABLE IF NOT EXISTS batch_workers(
           batch_id TEXT PRIMARY KEY REFERENCES batches(id), pid INTEGER, state TEXT,
           stop_requested INTEGER DEFAULT 0, error_code TEXT DEFAULT '', updated TEXT);
@@ -91,6 +113,17 @@ class Store:
         for name in ('config_signature','progress'):
             if name not in columns:
                 self.conn.execute(f"ALTER TABLE jobs ADD COLUMN {name} TEXT DEFAULT ''")
+        prompt_columns = {r[1] for r in self.conn.execute('PRAGMA table_info(prompt_metric_results)')}
+        if 'history_id' not in prompt_columns:
+            with self.conn:
+                self.conn.execute('BEGIN IMMEDIATE')
+                columns = {r[1] for r in self.conn.execute('PRAGMA table_info(prompt_metric_results)')}
+                if 'history_id' not in columns:
+                    self.conn.execute('ALTER TABLE prompt_metric_results ADD COLUMN history_id TEXT')
+                    self.conn.execute('UPDATE prompt_metric_results SET history_id=lower(hex(randomblob(16)))')
+                    self.conn.execute('''INSERT INTO prompt_result_history
+                        SELECT history_id,batch_id,case_id,metric_id,signature,NULL,NULL,status,NULL,payload,error_code,updated
+                        FROM prompt_metric_results''')
         self.conn.commit()
 
     def close(self):
@@ -135,6 +168,62 @@ class Store:
         rows = self.all("SELECT * FROM events WHERE case_id=?" + (" AND active=1" if active else "") + " ORDER BY document_id,page,id", (case_id,))
         for row in rows:
             row["attributes"] = json.loads(row["attributes"])
+        return rows
+
+    def save_prompt_result(self, batch_id, case_id, metric_id, signature, status, payload, error_code='', *,
+                           raw_response=None, model=None, prompt_version=None):
+        if not self.one('SELECT id FROM batches WHERE id=?', (batch_id,)):
+            raise ValueError('批次不存在')
+        if not self.one('SELECT id FROM cases WHERE id=?', (case_id,)):
+            raise ValueError('病例不存在')
+        history_id, created = uuid4().hex, stamp()
+        encoded = json.dumps(payload or {}, ensure_ascii=False)
+        with self.conn:
+            self.conn.execute(
+                'INSERT INTO prompt_result_history VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
+                (history_id, batch_id, case_id, metric_id, signature, model, prompt_version, status,
+                 json.dumps(raw_response, ensure_ascii=False), encoded, error_code, created),
+            )
+            self.conn.execute(
+                '''INSERT OR REPLACE INTO prompt_metric_results
+                   (batch_id,case_id,metric_id,signature,status,payload,error_code,updated,history_id)
+                   VALUES(?,?,?,?,?,?,?,?,?)''',
+                (batch_id, case_id, metric_id, signature, status, encoded, error_code, created, history_id),
+            )
+
+    def save_calculation(self, report):
+        run_id = uuid4().hex
+        config = report['calculation_config']
+        settings = {key: value for key, value in config.items() if key != 'prompt_metrics'}
+        settings.update({key: report['batch'].get(key) for key in ('start', 'end', 'population')})
+        with self.conn:
+            self.conn.execute('INSERT INTO calculation_runs VALUES(?,?,?,?,?,?)',
+                              (run_id, report['batch']['id'], report['rule_version'], report['scope_label'],
+                               json.dumps(settings, ensure_ascii=False), stamp()))
+            self.conn.executemany('INSERT INTO calculation_results VALUES(?,?,?)',
+                                  ((run_id, row['metric_id'], json.dumps(row, ensure_ascii=False))
+                                   for row in report['summary']))
+            self.conn.executemany('INSERT INTO calculation_details VALUES(?,?,?,?,?,?,?)',
+                                  ((run_id, row['metric_id'], position, row.get('case_id'), row.get('item_key'),
+                                    row.get('calculation_mode'), json.dumps({key: value for key, value in row.items()
+                                         if key != 'prompt_payload'}, ensure_ascii=False))
+                                   for position, row in enumerate(report['details'])))
+        return run_id
+
+    def prompt_results(self, batch_id, case_id=None, metric_id=None):
+        clauses = ['batch_id=?']
+        args = [batch_id]
+        if case_id is not None:
+            clauses.append('case_id=?')
+            args.append(case_id)
+        if metric_id is not None:
+            clauses.append('metric_id=?')
+            args.append(metric_id)
+        rows = self.all(
+            'SELECT * FROM prompt_metric_results WHERE ' + ' AND '.join(clauses) +
+            ' ORDER BY case_id,metric_id', tuple(args))
+        for row in rows:
+            row['payload'] = json.loads(row['payload'])
         return rows
 
     def audit(self, kind, oid, before, after, reviewer):
@@ -196,6 +285,9 @@ class Store:
             self.conn.execute("INSERT OR IGNORE INTO extraction_outputs SELECT ?,chunk_id,signature,event_ids,updated FROM extraction_outputs WHERE case_id=?", (target,source))
             self.conn.execute("DELETE FROM extraction_outputs WHERE case_id=?", (source,))
             self.conn.execute("UPDATE extraction_plans SET case_id=? WHERE case_id=?", (target,source))
+            # A merged stay changes the Prompt input scope; discard both
+            # candidates so the combined OCR is processed again.
+            self.conn.execute("DELETE FROM prompt_metric_results WHERE case_id IN (?,?)", (source,target))
             self.conn.execute("INSERT OR IGNORE INTO batch_cases SELECT batch_id,? FROM batch_cases WHERE case_id=?", (target, source))
             self.conn.execute("DELETE FROM batch_cases WHERE case_id=?", (source,))
             self.conn.execute("DELETE FROM cases WHERE id=?", (source,))

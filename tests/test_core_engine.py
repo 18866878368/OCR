@@ -2,8 +2,10 @@ from copy import deepcopy
 from pathlib import Path
 import tempfile
 import unittest
+import json
 
 from medocr.core_engine import Context, case_items, overlap_items, special_measures, rule_hash
+from medocr.report import export_report
 from medocr.rules import batch_report
 from medocr.specs import core_specs
 from medocr.store import Store
@@ -236,6 +238,28 @@ class CoreEngineTests(unittest.TestCase):
             self.assertEqual(indexed['core_25']['value'],0)
             self.assertEqual(indexed['core_30']['value'],0.5)
             self.assertEqual(indexed['core_31']['value'],5)
+            self.assertTrue(all(row['formula'] for row in report['summary']))
+            self.assertEqual(indexed['core_30']['measures']['A'], 1)
+            self.assertTrue(all(row['calculation_trace']['metric_id']==row['metric_id'] for row in report['details']))
+            consult = next(row for row in report['details'] if row['metric_id']=='core_05'
+                           and row['item_key']=='c_c1' and row['calculation_mode']=='reviewed')
+            trace = consult['calculation_trace']
+            self.assertEqual(trace['steps'][0]['evidence'][0]['page'], 1)
+            self.assertEqual(trace['numerator']['value'], 1)
+            critical = next(row for row in report['details'] if row['metric_id']=='core_31')
+            trace = critical['calculation_trace']
+            self.assertIn({'label':'报告时长（分钟）', 'value':5, 'evidence':critical['evidence']}, trace['steps'])
+            self.assertIsNone(trace['calculation']['value'])
+            folder = export_report(store,bid,{**CONFIG,'report_dir':str(Path(temp)/'reports')})
+            traces = json.loads((folder/'calculation_traces.json').read_text(encoding='utf-8'))
+            self.assertIn(consult, traces)
+            saved_report = json.loads((folder/'report.json').read_text(encoding='utf-8'))
+            order = store.one("SELECT payload FROM calculation_details WHERE run_id=? AND metric_id='core_23' AND item_key='c_o1'",
+                              (saved_report['run_id'],))
+            saved_order = json.loads(order['payload'])
+            self.assertEqual(saved_order['input_values']['stop_date'], '2025-04-01')
+            self.assertIn('c_o1', saved_order['fact_ids'])
+            self.assertEqual(saved_order['evidence'][0]['page'], 1)
             store.close()
 
     def test_unverified_validation_issues_cannot_enter_numeric_draft(self):
@@ -258,3 +282,44 @@ class CoreEngineTests(unittest.TestCase):
             self.assertIsNone(report['summary'][0]['value'])
             store.review_event('c_transfer',{'verified':True},'doctor')
             self.assertEqual(batch_report(store,bid,CONFIG)['summary'][0]['value'],1)
+
+    def test_reviewed_indicator_retains_structured_source_evidence(self):
+        with tempfile.TemporaryDirectory() as temp, Store(temp) as store:
+            bid = store.batch('evidence','2025-04-01','2025-04-30')
+            with store.conn:
+                store.conn.execute("INSERT INTO cases(id) VALUES('c')")
+                store.conn.execute("INSERT INTO documents VALUES('d_c','c','synthetic.pdf','hash',1)")
+                store.conn.execute("INSERT INTO batch_cases VALUES(?,'c')", (bid,))
+                store.conn.execute("INSERT INTO pages(document_id,page,stage,text) VALUES('d_c',1,'full','入院时间')")
+            store.save_event({'id':'c_admission','case_id':'c','kind':'admission',
+                              'event_time':'2025-04-01T08:00:00','document_id':'d_c',
+                              'page':1,'quote':'入院时间 2025-04-01 08:00','verified':False})
+            refs = [{'document_id':'d_c','page':1,'quote':'入院时间 2025-04-01 08:00'}]
+            store.save_review(bid,'c','core_01','admission',1,0,'人工核对',
+                              json.dumps({'references':refs,'note':'第1页'},ensure_ascii=False),'doctor')
+            report = batch_report(store,bid,CONFIG)
+            row = next(d for d in report['details']
+                       if d.get('metric_id')=='core_01' and d.get('calculation_mode')=='reviewed')
+            self.assertEqual(row['evidence'][0]['document_id'], refs[0]['document_id'])
+            self.assertEqual(row['evidence'][0]['page'], refs[0]['page'])
+            self.assertEqual(row['evidence'][0]['quote'], refs[0]['quote'])
+            self.assertEqual(row['review_evidence'], '第1页')
+
+    def test_pilot_indicators_emit_calculation_traces(self):
+        events = fixture()
+        ctx = self.context(events)
+        expected = {1: 'calculation_trace', 9: 'calculation_trace', 17: 'calculation_trace', 23: 'calculation_trace'}
+        for number in expected:
+            with self.subTest(indicator=number):
+                rows = case_items(number, ctx)
+                self.assertTrue(rows)
+                if number == 17:
+                    rows = [row for row in rows if row['item_key'] != 'coverage_unknown']
+                self.assertTrue(rows)
+                for row in rows:
+                    self.assertIn(expected[number], row)
+                    trace = row[expected[number]]
+                    self.assertEqual(trace['metric_id'], f'core_{number:02}')
+                    self.assertIn('retrieval', trace)
+                    self.assertIn('steps', trace)
+                    self.assertIn('calculation', trace)

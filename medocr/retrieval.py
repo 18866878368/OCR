@@ -36,11 +36,12 @@ def _plan(sources, numerator, denominator, calculation_rules, notes=(), conflict
 RETRIEVAL_RULES = {
     "core_01": _plan(
         [_source(["入院记录"], ["admission", "cover"], ["admission"], ["event_time"], ["入院时间", "入院日期"]),
-         _source(["病程记录", "转科记录", "转入记录", "转出记录"], ["progress", "transfer"], ["transfer"], ["record_time", "occurred", "from_department", "to_department", "from_icu", "to_icu"], ["转科记录", "转入记录", "转出记录", "记录时间", "文书记录时间"])],
-        {"event_types": ["transfer"], "fields": ["admission.event_time", "transfer.record_time", "transfer.occurred", "transfer.from_department", "transfer.to_department"], "conditions": ["转科记录时间在入院后48小时内", "排除转入或转出ICU"], "counting_unit": "住院人次"},
+         _source(["病程记录", "转科记录", "转入记录", "转出记录"], ["progress", "transfer"], ["transfer"], ["record_time", "occurred", "from_department", "to_department", "from_icu", "to_icu"], ["转科记录", "转入记录", "转出记录", "记录时间", "文书记录时间"]),
+         _source(["临时医嘱", "医嘱记录"], ["orders"], ["order"], ["event_time", "content", "transfer_candidate"], ["转科医嘱", "转入医嘱", "转出医嘱", "转科", "转入", "转出"])],
+        {"event_types": ["transfer", "order"], "fields": ["admission.event_time", "transfer.record_time", "transfer.occurred", "transfer.from_department", "transfer.to_department", "order.event_time", "order.transfer_candidate"], "conditions": ["转科记录或明确转科临时医嘱时间在入院后48小时内", "临时医嘱只能作为转科时间线索，须核对实际转科及科室", "排除转入或转出ICU"], "counting_unit": "住院人次"},
         {"fields": ["admission.event_time"], "conditions": ["每次住院纳入1个分母"], "counting_unit": "住院人次"},
-        {"time_window_hours": 48, "time_basis": "transfer.record_time", "exclude": ["from_icu", "to_icu"], "deduplicate_by": "episode_id"},
-        notes=("文档明确使用入院记录和病程/转科记录；必须保留原文页码和记录时间证据。",)),
+        {"time_window_hours": 48, "time_basis": "transfer.record_time", "order_time_basis": "order.event_time", "exclude": ["from_icu", "to_icu"], "deduplicate_by": "episode_id"},
+        notes=("转科时间通常来自病程/转科记录；临时医嘱中明确写有转入、转出或转科时，保留为辅助时间线索，不能单凭医嘱认定实际转科。",)),
     "core_02": _plan(
         [_source(["入院记录"], ["admission", "cover"], ["admission"], ["event_time"], ["入院时间", "入院日期"]),
          _source(["临时医嘱", "医嘱记录"], ["orders"], ["order"], ["event_time", "order_category", "content", "order_type"], ["临时医嘱", "医嘱内容", "开立时间", "医嘱开具时间"])],
@@ -88,10 +89,10 @@ RETRIEVAL_RULES = {
     "core_09": _plan(
         [_source(["长期医嘱", "医嘱记录"], ["orders", "discharge"], ["order"], ["event_time", "stop_time", "order_type", "nursing_level", "content"], ["长期医嘱", "护理级别", "特级护理", "一级护理", "停止时间"]),
          _source(["手术记录", "介入治疗记录", "内镜下治疗记录"], ["surgery"], ["surgery"], ["event_time", "procedure_name"], ["手术记录", "介入治疗", "内镜下治疗"])],
-        {"event_types": ["order", "surgery"], "fields": ["order.order_type", "order.event_time", "order.stop_time", "order.nursing_level", "surgery.event_time"], "conditions": ["存在手术", "出院前最后一次护理级别为特级或一级"], "counting_unit": "手术患者住院人次"},
-        {"fields": ["surgery.event_time"], "conditions": ["存在手术即纳入分母"], "counting_unit": "手术患者住院人次"},
-        {"last_value_before": "discharge", "allowed_nursing_levels": ["特级护理", "一级护理", "1级护理", "I级护理"]},
-        notes=("按文档从长期医嘱寻找出院前最后护理级别；缺失时保留待核验。",)),
+        {"event_types": ["order", "surgery"], "fields": ["order.order_type", "order.event_time", "order.stop_time", "order.nursing_level", "surgery.event_time", "surgery.grade"], "conditions": ["存在四级手术", "出院前最后一次护理级别为特级或一级"], "counting_unit": "四级手术患者住院人次"},
+        {"fields": ["surgery.event_time", "surgery.grade"], "conditions": ["手术级别为四级才纳入分母"], "counting_unit": "四级手术患者住院人次"},
+        {"last_value_before": "discharge", "allowed_nursing_levels": ["特级护理", "一级护理", "1级护理", "I级护理"], "surgery_grade": 4},
+        notes=("按病案首页第二页/手术事实筛选四级手术；再从长期医嘱寻找出院前最后护理级别；缺失时保留待核验。",)),
     "core_10": _plan(
         [_source(["手术记录", "病案首页第二页", "四级手术/介入记录"], ["surgery", "cover"], ["surgery"], ["event_time", "procedure_name", "procedure_code", "grade"], ["四级手术", "四级", "手术级别"]),
          _source(["交接记录单", "床旁交接班记录"], ["nursing"], ["nursing"], ["event_time", "nursing_type"], ["床旁交接班", "交接班时间"])],
@@ -150,6 +151,34 @@ RETRIEVAL_RULES = {
         {"event_types": ["surgery"], "conditions": ["存在实际手术"], "counting_unit": "手术事件"},
         {"relation": "discussion_for_surgery", "match": "planned_surgeon_equals_actual_surgeon"},
         conflicts=("文档截图将本项也写成手术医师参与讨论，现有指标定义按计划术者与实际术者一致执行，待医院确认。",)),
+    "core_19": _plan(
+        [_source(["死亡病例讨论结论记录"], ["discussion", "progress"], ["discussion"], ["event_time", "discussion_type", "conclusion"], ["死亡病例讨论", "讨论时间", "讨论结论"]),
+         _source(["死亡记录", "病案首页"], ["death", "cover", "discharge"], ["death", "discharge"], ["event_time", "discharge_mode"], ["死亡时间", "离院方式", "5"] )],
+        {"event_types": ["discussion", "death", "discharge"], "fields": ["discussion.event_time", "death.event_time", "discharge.discharge_mode"], "conditions": ["死亡病例讨论时间与死亡时间按医院口径核对", "离院方式为5"], "counting_unit": "死亡病例"},
+        {"fields": ["discharge.discharge_mode"], "conditions": ["离院方式为5"], "counting_unit": "死亡病例"},
+        {"discharge_mode": 5, "discussion_type": "death"}),
+    "core_21": _plan(
+        [_source(["死亡病例讨论结论记录"], ["discussion", "progress"], ["discussion"], ["event_time", "discussion_type", "host", "host_role"], ["死亡病例讨论", "科主任", "主持人"]),
+         _source(["病案首页"], ["cover", "discharge"], ["discharge"], ["discharge_mode"], ["离院方式", "5"])],
+        {"event_types": ["discussion", "discharge"], "fields": ["discussion.host", "discussion.host_role", "discharge.discharge_mode"], "conditions": ["科主任主持死亡病例讨论", "离院方式为5"], "counting_unit": "死亡病例"},
+        {"fields": ["discharge.discharge_mode"], "conditions": ["离院方式为5"], "counting_unit": "死亡病例"},
+        {"discussion_type": "death", "required_host_role": "科主任"}),
+    "core_23": _plan(
+        [_source(["长期医嘱"], ["orders"], ["order"], ["event_time", "stop_time", "order_type", "content"], ["长期医嘱", "起始日期", "停止日期", "长期"])],
+        {"event_types": ["order"], "fields": ["order.event_time", "order.stop_time", "order.order_type"], "conditions": ["长期医嘱同时有起始和停止日期"], "counting_unit": "长期医嘱"},
+        {"event_types": ["order"], "conditions": ["长期医嘱数量"], "counting_unit": "长期医嘱"},
+        {"order_type": "long", "required_fields": ["event_time", "stop_time"]}),
+    "core_28": _plan(
+        [_source(["病案首页第二页", "术前讨论记录"], ["cover", "discussion"], ["surgery", "discussion"], ["grade", "participants", "departments"], ["四级手术", "参加人员", "参加科室", "术前讨论"])],
+        {"event_types": ["surgery", "discussion"], "fields": ["surgery.grade", "discussion.participants", "discussion.departments"], "conditions": ["四级手术且术前讨论至少3个科室人员参与"], "counting_unit": "四级手术"},
+        {"event_types": ["surgery"], "fields": ["surgery.grade"], "conditions": ["手术级别为四级"], "counting_unit": "四级手术"},
+        {"grade": 4, "min_departments": 3}),
+    "core_33": _plan(
+        [_source(["会诊记录"], ["consultation", "progress"], ["consultation"], ["opinion"], ["特殊使用级抗菌药物", "会诊意见"]),
+         _source(["临时医嘱"], ["orders"], ["order"], ["content", "event_time", "order_type"], ["临时医嘱", "抗菌药物", "特殊使用级"])],
+        {"event_types": ["consultation", "order"], "fields": ["consultation.opinion", "order.content", "order.event_time"], "conditions": ["会诊意见中的特殊使用级抗菌药物与临时医嘱对应"], "counting_unit": "特殊级抗菌药物医嘱"},
+        {"event_types": ["order"], "conditions": ["存在特殊使用级抗菌药物临时医嘱"], "counting_unit": "特殊级抗菌药物医嘱"},
+        {"order_type": "temporary", "relation": "consultation_for_antibiotic"}),
 }
 
 

@@ -9,6 +9,7 @@ import time
 from .errors import ProcessingStopped
 from .extract import extract_case
 from .facts import request_json, release_local_model, VERSION
+from .prompt_metrics import PROMPT_VERSION, run_prompt_metrics, validate_prompt_config
 from .rules import RULE_VERSION
 from .pipeline import import_pdf, process_pages
 from .report import export_report
@@ -90,30 +91,45 @@ def run_batch(store, batch_id, config, use_llm=False, scope='all', force=False):
         store.conn.commit()
     except Exception:
         store.conn.rollback(); raise
-    stats = {'complete':0,'cached':0,'failed':0,'assistance_failed':0,'stopped':False}
+    stats = {'complete':0,'cached':0,'failed':0,'assistance_failed':0,
+             'prompt_failed':0,'stopped':False}
     mode = 'assisted' if use_llm else 'rules'
     config = {**config,'extraction_mode':mode}
     with store.conn:
         store.conn.execute('INSERT OR REPLACE INTO batch_processing VALUES(?,?,?)',(batch_id,mode,stamp()))
-    signature = digest(json.dumps([mode,config.get('icu_departments'),config.get('ocr'),config.get('llm') if use_llm else None,
-                                   scope,config.get('selected_metrics'),config.get('hospital_reference',{}),VERSION,RULE_VERSION],sort_keys=True))
+    signature = digest(json.dumps([mode,config.get('icu_departments'),config.get('ocr'),
+                                   config.get('llm') if use_llm else None,
+                                   config.get('semantic_assist') if use_llm else None,
+                                   config.get('prompt_metrics') if use_llm else None,
+                                   scope,config.get('selected_metrics'),config.get('hospital_reference',{}),
+                                   VERSION,RULE_VERSION,PROMPT_VERSION if use_llm else None],sort_keys=True))
     def checkpoint():
         worker = store.one('SELECT * FROM batch_workers WHERE batch_id=?',(batch_id,))
         if worker and worker['stop_requested']:
             raise ProcessingStopped('已请求停止；当前任务保留检查点，可继续处理')
     try:
-        assistance_available = use_llm
+        semantic_available = bool(use_llm and config.get('semantic_assist', {}).get('enabled', False)
+                                  and config.get('llm', {}).get('enabled'))
+        prompt_available = bool(use_llm and config.get('prompt_metrics', {}).get('enabled', True))
         assistance_error = ''
-        try:
-            preflight(config,use_llm)
-        except Exception as exc:
-            assistance_available = False
-            assistance_error = type(exc).__name__
-        if assistance_available:
+        prompt_error = ''
+        if semantic_available:
+            try:
+                preflight(config, True)
+            except Exception as exc:
+                semantic_available = False
+                assistance_error = type(exc).__name__
+        if prompt_available:
+            try:
+                validate_prompt_config(config)
+            except Exception as exc:
+                prompt_available = False
+                prompt_error = type(exc).__name__
+        if semantic_available:
             try:
                 release_local_model(config)
             except Exception as exc:
-                assistance_available = False
+                semantic_available = False
                 assistance_error = type(exc).__name__
         jobs = store.all('SELECT * FROM jobs WHERE batch_id=? ORDER BY path',(batch_id,))
         if not jobs:
@@ -141,7 +157,7 @@ def run_batch(store, batch_id, config, use_llm=False, scope='all', force=False):
                 # Release cached OCR allocations before the local text model is called.
                 import gc
                 gc.collect()
-                if assistance_available and 'paddle' in sys.modules:
+                if semantic_available and 'paddle' in sys.modules:
                     import paddle
                     if paddle.device.is_compiled_with_cuda():
                         paddle.device.cuda.empty_cache()
@@ -151,20 +167,35 @@ def run_batch(store, batch_id, config, use_llm=False, scope='all', force=False):
                                code if code.startswith('正在') or code.startswith('已复用') else
                                f'第 {page} 页提取未完成，可继续处理重试')
                     update('extracting',cid,progress=message)
-                extracted = extract_case(store,cid,config,assistance_available,extraction_progress,force=force,checkpoint=checkpoint)
-                if assistance_available:
+                extracted = extract_case(store,cid,config,semantic_available,extraction_progress,force=force,checkpoint=checkpoint)
+                prompt_error = ''
+                if prompt_available:
+                    try:
+                        prompt_run = run_prompt_metrics(
+                            store, batch_id, cid, config, force=force,
+                            checkpoint=checkpoint,
+                            progress=lambda page, message: update('prompting', cid, progress=message),
+                        )
+                        if prompt_run.get('status') not in {'complete', 'cached'}:
+                            prompt_error = 'PromptPartial'
+                    except ProcessingStopped:
+                        raise
+                    except Exception as exc:
+                        prompt_error = type(exc).__name__
+                        stats['prompt_failed'] += 1
+                if semantic_available:
                     try:
                         release_local_model(config)
                     except Exception as exc:
                         assistance_error = type(exc).__name__
-                if use_llm and (extracted['failed_pages'] or assistance_error):
-                    update('partial',cid,assistance_error or 'SemanticAssistancePartial',
-                           '规则提取已完成；部分语义辅助待重试，现有事实可复核')
+                if use_llm and (extracted['failed_pages'] or assistance_error or prompt_error):
+                    update('partial',cid,assistance_error or prompt_error or 'SemanticAssistancePartial',
+                           '规则提取已完成；部分语义辅助或复杂指标Prompt待重试，现有事实可复核')
                     stats['assistance_failed'] += 1
                 elif extracted['failed_pages']:
                     update('error',cid,'ExtractionFailure'); stats['failed'] += 1
                 else:
-                    update('complete',cid,progress='规则及可选语义辅助完成，等待复核' if use_llm else '规则提取完成，证据不足处待人工核查；未调用语义模型')
+                    update('complete',cid,progress='规则提取及复杂指标Prompt完成，等待复核' if use_llm else '规则提取完成，证据不足处待人工核查；未调用语义模型')
                     stats['complete'] += 1
             except ProcessingStopped:
                 update('pending',progress='已停止，可继续'); raise

@@ -41,6 +41,7 @@ class StoreTests(unittest.TestCase):
         config = {**CFG,'report_dir':str(Path(self.tmp.name)/'reports')}
         folder = export_report(self.store,self.bid,config)
         self.assertTrue((folder/'summary.csv').exists())
+        self.assertTrue((folder/'calculation_traces.json').exists())
         self.assertEqual(json.loads((folder/'report.json').read_text(encoding='utf-8'))['case_count'],1)
 
     def test_partial_event_enumeration_blocks_result(self):

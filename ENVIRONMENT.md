@@ -19,7 +19,7 @@ F:\医疗质量管理\OCR\models\blobs\sha256-85e4a5b7b8ef0e48af0e8658f5aaab9c23
 ```powershell
 conda activate medocr
 Set-Location -LiteralPath 'F:\医疗质量管理\OCR'
-python -m medocr doctor
+python -m medocr.cli doctor
 python -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501 --browser.gatherUsageStats false --server.maxUploadSize 512
 ```
 
@@ -35,7 +35,7 @@ python -m pip install -e .
 python -m pip install paddlepaddle-gpu==3.2.2 -i https://www.paddlepaddle.org.cn/packages/stable/cu126/
 python -m pip install -e '.[ocr]'
 python tools\download_models.py --version v6
-python -m medocr doctor
+python -m medocr.cli doctor
 ```
 
 以下 venv 步骤为不用 Conda 时的备选，不需要在已有 medocr 环境中再执行。

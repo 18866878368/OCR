@@ -53,6 +53,36 @@ class RuleFirstTests(unittest.TestCase):
         row=rule_facts(page('手术开始时间：2025-04-01 09:00 / 2025-04-01 10:00'))[0]
         self.assertIsNone(row['event_time'])
 
+    def test_context_aware_times_and_titles_fill_fields_without_time_leakage(self):
+        consultation = rule_facts(page(
+            '会诊记录\n会诊类型：普通会诊\n申请时间：2025-04-1809:43\n'
+            '会诊时间：2025-04-18 11:26\n会诊意见：同意'))[0]
+        self.assertEqual(consultation['event_time'], '2025-04-18T09:43:00')
+        self.assertEqual(consultation['attributes']['completion_time'], '2025-04-18T11:26:00')
+        self.assertEqual(consultation['attributes']['urgency'], 'ordinary')
+
+        surgery = rule_facts(page(
+            '手术记录\n手术名称：经皮二尖瓣置换术\n'
+            '手术开始时间 2025-05-13 09:00\n手术结束时间 2025-05-13 12:15\n'
+            '手术医师：张三\n手术级别：四级'))[0]
+        self.assertEqual(surgery['event_time'], '2025-05-13T09:00:00')
+        self.assertEqual(surgery['attributes']['end_time'], '2025-05-13T12:15:00')
+        self.assertEqual(surgery['attributes']['grade'], 4)
+        self.assertEqual(surgery['attributes']['surgeon'], '张三')
+
+    def test_surgical_handover_time_is_not_a_ward_transfer(self):
+        self.assertEqual(rule_facts(page(
+            '手术病人交接记录单\n转入时间：2025-05-13 12:50')), [])
+
+    def test_ward_round_title_supplies_physician_and_event_time(self):
+        row = rule_facts(page(
+            '2025-04-13 09:06 厉泉主任医师查房记录\n'
+            '患者病情稳定\n查房嘱：继续治疗'))[0]
+        self.assertEqual(row['kind'], 'ward_round')
+        self.assertEqual(row['event_time'], '2025-04-13T09:06:00')
+        self.assertEqual(row['attributes']['physician'], '厉泉')
+        self.assertEqual(row['attributes']['physician_role'], '主任医师')
+
     def test_order_table_selects_opening_column_not_execution_or_stop(self):
         text='医嘱编号|开立时间|执行时间|停止时间|医嘱内容\nA1|2025-04-01 09:00|2025-04-01 12:00|2025-04-02 08:00|吸氧治疗\nA2|2025-04-01 10:00|2025-04-01 13:00||CT检查'
         rows=rule_facts(page(text,'orders'))

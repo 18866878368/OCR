@@ -220,13 +220,30 @@ def batch_report(store, batch_id, config):
     automated,drafts = {},{}
     if config.get('calculation_engine')=='core35':
         from .core_engine import evaluate_core
+        from .core_engine import _structured_evidence
         automated,confirmed_details = evaluate_core(store,batch,config)
         drafts,draft_details = evaluate_core(store,batch,config,draft=True)
+        # A reviewed row can legitimately have no current verified fact after
+        # source-scope invalidation, while its draft still has the current
+        # page/quote candidate.  Keep that candidate locator visible rather
+        # than letting a free-text review evidence value erase it.
+        draft_by_key = {(r.get('case_id'),r.get('metric_id'),r.get('item_key')): r
+                        for r in draft_details}
+        for row in confirmed_details:
+            if _structured_evidence(row.get('evidence')):
+                continue
+            candidate = draft_by_key.get((row.get('case_id'),row.get('metric_id'),row.get('item_key')))
+            refs = _structured_evidence(candidate.get('evidence')) if candidate else []
+            if refs:
+                row['evidence'] = refs
+                row['evidence_source'] = 'draft_candidate'
         details.extend(confirmed_details+draft_details)
     for metric in active_metrics(config):
         measures = store.all('SELECT * FROM measures WHERE batch_id=? AND metric_id=?',(batch_id,metric['id']))
         if measures:
-            result = calculate_measures(metric,{m['measure']:json.loads(m['value']) for m in measures})
+            inputs = {m['measure']:json.loads(m['value']) for m in measures}
+            result = calculate_measures(metric, inputs)
+            result.update(measures=inputs, calculation_source='manual')
             result['sources'] = [{k:m[k] for k in ('measure','source','reviewer','updated')} for m in measures]
         elif metric['id'] in automated:
             result = dict(automated[metric['id']])
@@ -250,15 +267,43 @@ def batch_report(store, batch_id, config):
             if not cases:
                 result.update(status='无法计算',missing=['批次没有病例'])
         draft = drafts.get(metric['id'],{}) if not measures else {}
+        # Show a useful preliminary value for ordinary consultation completion
+        # when the draft evidence is determinate, even though the confirmed
+        # view still waits for completeness and any hospital rule approval.
+        if metric['id'] in {'core_07','core_09'} and draft.get('value') is not None and result.get('value') is None:
+            result.update(numerator=draft.get('numerator'), denominator=draft.get('denominator'),
+                          value=draft.get('value'), status='自动初判，待复核')
+        if metric['id'] == 'core_09' and result.get('value') is None:
+            # A nursing row may carry unrelated missing order fields. For the
+            # preliminary view, use the two fields this metric actually needs.
+            from .candidate_scope import scoped_events
+            from .rule_extract import rule_first_events
+            provisional = []
+            for case in cases:
+                facts = rule_first_events(scoped_events(store,case['id'],config,batch_mode(store,batch_id,config)))
+                surgeries = [e for e in facts if e['kind']=='surgery' and e['attributes'].get('grade')==4]
+                orders = [e for e in facts if e['kind']=='order' and e['attributes'].get('order_type')=='long' and e['attributes'].get('nursing_level')]
+                if surgeries and orders:
+                    latest = max(orders, key=lambda e: e.get('event_time') or '')
+                    level = latest['attributes'].get('nursing_level','')
+                    provisional.append({'denominator':1,'numerator':1 if any(x in level for x in ('特级','一级','1级','I级')) else 0})
+            if provisional:
+                pn=sum(x['numerator'] for x in provisional); pd=sum(x['denominator'] for x in provisional)
+                result.update(numerator=pn,denominator=pd,value=pn/pd if pd else None,status='自动初判，待复核')
+                draft.update(numerator=pn, denominator=pd, value=pn/pd if pd else None,
+                             status='自动初判，待复核', missing=['四级手术及护理级别对象完整性尚未确认'])
         if identity_issues and metric['id']!='core_30' and not measures:
             result.update(value=None,status='住院人次待核对',missing=list(result.get('missing',[]))+['存在疑似同次住院的多个病例文件'])
-        summary.append({'metric_id':metric['id'],'name':metric['name'],'kind':metric['kind'],'unit':metric['unit'],**result,
+        summary.append({'metric_id':metric['id'],'name':metric['name'],'kind':metric['kind'],'unit':metric['unit'],
+                        'formula':metric.get('formula'),**result,
+                        'calculation_source': result.get('calculation_source', 'rule'),
                         'draft_numerator':draft.get('numerator'),'draft_denominator':draft.get('denominator'),
                         'draft_value':draft.get('value'),'draft_status':draft.get('status'),'draft_missing':draft.get('missing',[]),
+                        'draft_calculation_source': draft.get('calculation_source', result.get('calculation_source', 'rule')),
                         'draft_unknown_denominator_groups':draft.get('unknown_denominator_groups',0),
                         'draft_unknown_numerator_objects':draft.get('unknown_numerator_objects',0),
                         'draft_measures':draft.get('measures')})
     page_counts = store.one("SELECT COUNT(*) total, COALESCE(SUM(p.stage='full'),0) recognized, COALESCE(SUM(p.stage='error'),0) failed FROM pages p JOIN documents d ON p.document_id=d.id JOIN batch_cases b ON b.case_id=d.case_id WHERE b.batch_id=?",(batch_id,))
     return {'batch':batch,'rule_version':RULE_VERSION,'scope_label':'医院确认完整病案集合（文书统计）' if batch['population']=='hospital_confirmed_complete' else '提交病案集合/样本统计',
             'case_count':len(cases),'pages':page_counts,'summary':summary,'details':details,'identity_issues':identity_issues,
-            'calculation_config':{k:config.get(k) for k in ('indicator_set','calculation_engine','transfer_time_basis','high_cost_threshold','extraction_mode')}}
+            'calculation_config':{k:config.get(k) for k in ('indicator_set','calculation_engine','transfer_time_basis','high_cost_threshold','extraction_mode','prompt_metrics')}}

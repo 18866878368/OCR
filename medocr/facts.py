@@ -11,6 +11,7 @@ from .retrieval import RETRIEVAL_VERSION
 from .errors import ProcessingStopped
 from .dates import date_values, canonical_date, composed_times
 from .candidate_scope import rule_signature, semantic_chunk, current_scope, scoped_events, link_signature
+from .store import stamp
 
 VERSION = 'core-facts-v6-rule-first'
 ENUMS = {
@@ -385,9 +386,34 @@ def extract_facts_case(store, case_id, config, use_llm=False, progress=None, for
     if not pages:
         raise ValueError('病例不存在')
     count = {'events':0,'failed_pages':0,'skipped_pages':sum(p['stage']!='full' for p in pages),'cached_chunks':0,'chunks':0,'links':0}
+    # Use the PDF's embedded level-1 bookmarks as document context for facts.
+    # Rule extraction remains page based; this metadata prevents later indicator
+    # retrieval from mixing facts from adjacent document types.
+    from .segmentation import segment_documents
+    hierarchy_segments = segment_documents(pages)
+
+    def annotate_event(event):
+        candidates = [segment for segment in hierarchy_segments
+                      if segment.get('document_id') == event.get('document_id')
+                      and segment.get('start_page', 0) <= event.get('page', 0) <= segment.get('end_page', 0)]
+        if not candidates:
+            return event
+        quote = ''.join(str(event.get('quote', '')).split())
+        exact = [segment for segment in candidates
+                 if quote and quote in ''.join(str(segment.get('text', '')).split())]
+        segment = min(exact or candidates, key=lambda item: len(item.get('text', '')))
+        attrs = event.setdefault('attributes', {})
+        attrs['_segment_id'] = segment.get('segment_id')
+        if segment.get('outline_title'):
+            attrs['_outline_title'] = segment.get('outline_title')
+            attrs['_outline_type'] = segment.get('outline_type')
+            attrs['_outline_source'] = segment.get('outline_source')
+        return event
+
     from .rule_extract import rule_facts, semantic_kinds, rule_links, RULE_EXTRACT_VERSION
     targets = []
     existing = store.events(case_id)
+    previous_discussion = None
     for page_number,page in enumerate(pages,1):
         if checkpoint:
             checkpoint()
@@ -410,17 +436,58 @@ def extract_facts_case(store, case_id, config, use_llm=False, progress=None, for
                             store.conn.execute('UPDATE events SET attributes=? WHERE id=?',
                                 (json.dumps({**e['attributes'],'_stale':True},ensure_ascii=False),e['id']))
                 rows = rule_facts(page,config)
+                # Continuation pages often contain the planned procedure but
+                # omit the header timestamp. Carry the immediately preceding
+                # titled preoperative discussion time into that continuation
+                # while keeping both pages in the evidence list.
                 for event in rows:
+                    if event['kind'] == 'discussion':
+                        attrs = event['attributes']
+                        if attrs.get('continuation') and not event.get('event_time') and previous_discussion:
+                            event['event_time'] = previous_discussion['event_time']
+                            attrs['event_date'] = previous_discussion['attributes'].get('event_date')
+                            attrs['_continuation_of_page'] = previous_discussion['page']
+                            attrs['_evidence'] = list(attrs.get('_evidence', [])) + [{
+                                'document_id': previous_discussion['document_id'],
+                                'page': previous_discussion['page'],
+                                'quote': previous_discussion['quote'][:300]}]
+                        if not attrs.get('continuation') and event.get('event_time'):
+                            previous_discussion = event
+                for event in rows:
+                    annotate_event(event)
                     event['id'] = hashlib.sha256((event['id']+signature).encode()).hexdigest()[:20]
                     event['attributes'].update(_rule_page=key,_rule_signature=signature)
                     store.save_event(event)
                 store.extraction_status(case_id,key,signature,'complete',event_ids=[e['id'] for e in rows])
             count['events'] += len(rows)
+            for event in rows:
+                annotate_event(event)
             kinds = semantic_kinds(page,rows)
             if kinds:
                 targets.append({**page,'_semantic_kinds':kinds})
             if progress:
                 progress(page['page'],f'规则提取 {page_number} / {len(pages)} 页 · 待辅助文书 {len(targets)} 页')
+    # Backfill timestamps for continuation discussion facts after all pages
+    # are extracted. This also handles cached pages whose predecessor was
+    # processed in a previous pass.
+    discussion_rows = [e for e in store.events(case_id, active=False)
+                       if e['kind']=='discussion' and not e['attributes'].get('_stale')]
+    for event in discussion_rows:
+        if not event['attributes'].get('continuation') or event.get('event_time'):
+            continue
+        prior = [e for e in discussion_rows if e['page'] < event['page'] and e.get('event_time') and
+                 not e['attributes'].get('continuation')]
+        if not prior:
+            continue
+        source = max(prior, key=lambda e:e['page'])
+        attrs = {**event['attributes'], 'event_date': source['attributes'].get('event_date'),
+                 '_continuation_of_page': source['page'],
+                 '_evidence': list(event['attributes'].get('_evidence', [])) + [{
+                     'document_id': source['document_id'], 'page': source['page'],
+                     'quote': source['quote'][:300]}]}
+        with store.conn:
+            store.conn.execute('UPDATE events SET event_time=?,attributes=?,updated=? WHERE id=?',
+                               (source['event_time'], json.dumps(attrs,ensure_ascii=False), stamp(), event['id']))
     scope = current_scope(store,case_id,config,'assisted' if use_llm else 'rules')
     store.extraction_plan(case_id,scope)
     count['links'] = rule_links(store,case_id,config)

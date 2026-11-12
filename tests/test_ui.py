@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from pypdf import PdfWriter
 from streamlit.testing.v1 import AppTest
 
 from medocr.config import load_config
@@ -17,15 +18,21 @@ class InterfaceTests(unittest.TestCase):
         cfg=load_config(root/'config.json')
         with tempfile.TemporaryDirectory() as temp:
             cfg.update(data_dir=str(Path(temp)/'data'),work_dir=str(Path(temp)/'work'),report_dir=str(Path(temp)/'reports'))
+            source_pdf = Path(temp)/'source.pdf'
+            writer = PdfWriter()
+            writer.add_blank_page(595,842)
+            writer.write(source_pdf)
             with Store(cfg['data_dir']) as store:
                 bid=store.batch('界面合成测试','2025-04-01','2025-04-30')
                 with store.conn:
                     store.conn.execute("INSERT INTO cases(id) VALUES('c')")
-                    store.conn.execute("INSERT INTO documents VALUES('d_c','c','synthetic.pdf','synthetic_hash',1)")
+                    store.conn.execute("INSERT INTO documents VALUES('d_c','c',?,'synthetic_hash',1)",(str(source_pdf),))
                     store.conn.execute("INSERT INTO batch_cases VALUES(?,'c')",(bid,))
                     store.conn.execute("INSERT INTO pages(document_id,page,text,stage) VALUES('d_c',1,'synthetic evidence','full')")
                 for e in fixture():
                     store.save_event(e)
+                store.save_measure(bid,'core_31','minutes',[2,8],'合成危急值台账','tester')
+                store.save_measure(bid,'core_31','eligible_total',2,'合成危急值台账','tester')
                 # The queue panel is rendered without starting a worker or loading a model.
                 pending=Path(temp)/'synthetic.pdf'; pending.write_bytes(b'synthetic queue only')
                 enqueue(store,bid,[pending])
@@ -36,6 +43,29 @@ class InterfaceTests(unittest.TestCase):
                 app.radio(key='navigation').set_value('查看结果').run()
                 self.assertFalse(app.exception)
                 self.assertEqual(len(app.dataframe[0].value),35)
+                app.selectbox(key='result_metric').set_value('core_05').run()
+                self.assertFalse(app.exception)
+                self.assertTrue(any(row.value=='### 结果展示' for row in app.markdown))
+                result = next(row for row in app.expander if row.label=='第 1 条 · 规则')
+                self.assertFalse(result.checkbox)
+                self.assertTrue(any('证据页：1' in row.value for row in result.caption))
+                audit = next(row for row in app.expander if '开发/审计详情' in row.label)
+                self.assertTrue(any('PDF 第 1 页' in row.value for row in audit.markdown))
+                next(box for box in audit.checkbox if box.label=='显示依据所在 PDF 原页').check().run()
+                self.assertFalse(app.exception)
+                self.assertFalse(app.error)
+                audit = next(row for row in app.expander if '开发/审计详情' in row.label)
+                self.assertEqual(audit.image[0].captions, ['原始 PDF 第 1 页'])
+                next(box for box in audit.checkbox if box.label=='查看该页 OCR 全文').check().run()
+                audit = next(row for row in app.expander if '开发/审计详情' in row.label)
+                self.assertEqual(audit.text_area[0].value, 'synthetic evidence')
+                app.selectbox(key='result_metric').set_value('core_30').run()
+                self.assertTrue(any('四年新技术新项目台账' in row.value for row in app.markdown))
+                app.selectbox(key='result_metric').set_value('core_31').run()
+                next(r for r in app.radio if r.label=='结果类型').set_value('已复核结果').run()
+                self.assertFalse(app.exception)
+                self.assertTrue(any('5 分钟' in row.value for row in app.info))
+                self.assertTrue(any('医院补充统计' in row.value for row in app.info))
                 app.radio(key='navigation').set_value('核对与复核').run()
                 app.radio(key='review_section').set_value('指标复核').run()
                 self.assertEqual(len(app.selectbox(key='review_metric').options),35)
@@ -54,7 +84,6 @@ class InterfaceTests(unittest.TestCase):
         cfg=load_config(root/'config.local.json')
         with tempfile.TemporaryDirectory() as temp:
             cfg.update(data_dir=str(Path(temp)/'data'),work_dir=str(Path(temp)/'work'),report_dir=str(Path(temp)/'reports'))
-            from pypdf import PdfWriter
             from medocr.pipeline import import_pdf
             pdf=Path(temp)/'synthetic.pdf'; writer=PdfWriter(); writer.add_blank_page(595,842)
             with pdf.open('wb') as file: writer.write(file)
@@ -78,9 +107,13 @@ class InterfaceTests(unittest.TestCase):
 
     def test_unknown_and_ratio_formats(self):
         from medocr.ui_workflow import format_value,chinese_csv
+        from medocr.review_ui import _format_calculation
         self.assertEqual(format_value(None,'rate'),'待补充 / 待复核')
         self.assertEqual(format_value(0.2,'rate'),'20.00%')
         self.assertEqual(format_value(0.2,'rate_ratio'),'0.2')
+        self.assertEqual(_format_calculation({'kind':'median','value':5,'denominator':2},False),'5 分钟（应统计 2 条）')
+        self.assertEqual(_format_calculation({'kind':'retention','value':0.5,'numerator':3,'denominator':6},False),'3 / 6 = 50.00%')
+        self.assertEqual(_format_calculation({'kind':'ratio','value':1.5,'numerator':3,'denominator':2},False),'3 / 2 = 1.5')
         self.assertIn("'=HYPERLINK",chinese_csv([{'指标':'=HYPERLINK(test)'}]).decode('utf-8-sig'))
 
     def test_historical_candidates_are_hidden_and_excluded_from_bulk_review(self):

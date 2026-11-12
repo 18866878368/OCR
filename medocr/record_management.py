@@ -11,7 +11,7 @@ from .batch import process_alive
 from .candidate_scope import current_scope, scoped_events
 from .store import stamp
 
-REPORT_FILES = ('report.json','summary.csv','details.csv','facts.json','facts.csv','processing.json','README.txt')
+REPORT_FILES = ('report.json','summary.csv','details.csv','calculation_traces.json','facts.json','facts.csv','prompt_metrics.json','processing.json','README.txt')
 
 
 def deletion_plan(store, batch_id, config, kind):
@@ -128,10 +128,10 @@ def delete_records(store, batch_id, config, kind, confirmed=False, backup=True, 
                             (json.dumps(kept),cid,row['chunk_id'],row['signature']))
             store.conn.executemany('DELETE FROM events WHERE id=?',[(eid,) for eid in removing])
         else:
-            for table in ('reviews','coverage','measures','rule_approvals','jobs','batch_workers','batch_processing','batch_cases'):
+            for table in ('reviews','coverage','measures','rule_approvals','prompt_metric_results','jobs','batch_workers','batch_processing','batch_cases'):
                 store.conn.execute(f'DELETE FROM {table} WHERE batch_id=?',(batch_id,))
             for cid in plan['exclusive_case_ids']:
-                for table in ('extraction_runs','extraction_outputs','extraction_plans','events'):
+                for table in ('extraction_runs','extraction_outputs','extraction_plans','prompt_metric_results','events'):
                     store.conn.execute(f'DELETE FROM {table} WHERE case_id=?',(cid,))
                 store.conn.execute('DELETE FROM pages WHERE document_id IN (SELECT id FROM documents WHERE case_id=?)',(cid,))
                 store.conn.execute('DELETE FROM documents WHERE case_id=?',(cid,))
